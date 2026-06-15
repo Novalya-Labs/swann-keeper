@@ -5,56 +5,60 @@
 # service "bot". Playback is @discordjs/voice + yt-dlp + ffmpeg (no Lavalink,
 # no JVM) — much lighter on a Raspberry Pi.
 #
-# Base is the HA Alpine base (multi-arch incl. aarch64) which ships s6-overlay
-# v3 + bashio. No CMD/ENTRYPOINT override: s6-overlay stays the init.
+# Base is the HA *Debian* (glibc) base, NOT Alpine. The native addons
+# (@discordjs/opus, sherpa-onnx-node, @picovoice/porcupine-node) only ship
+# prebuilt binaries for glibc — on Alpine/musl @discordjs/opus has no prebuild
+# and its from-source build fails on ARM64 (libopus NEON bug). On glibc they
+# all download prebuilds, so no C/C++ toolchain is needed at all.
 #
-# Alpine = musl, so @discordjs/opus and sherpa-onnx-node have no matching glibc
-# prebuilds and compile from source — hence the (virtual) build toolchain.
+# Node is pinned to 22 (NodeSource): @discordjs/opus 0.10.0 publishes prebuilds
+# only up to node-v127 (Node 22). Node 24 (node-v137) has NO prebuild and would
+# force the failing source compile.
 # =============================================================================
-ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23
+ARG BUILD_FROM=ghcr.io/home-assistant/aarch64-base-debian:bookworm
 FROM ${BUILD_FROM}
 
-SHELL ["/bin/ash", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
 
 # --- Runtime packages ------------------------------------------------------
-# nodejs / npm  : the bot runtime (Alpine 3.23 ships Node 22)
-# yt-dlp        : YouTube/search resolution + audio stream URLs (community repo)
-# ffmpeg        : prism-media transcode (48k stereo -> 16k mono) + playback
-# libsodium / opus : voice deps (libsodium-wrappers is WASM, opus for @discordjs/opus)
-RUN apk add --no-cache \
-      nodejs \
-      npm \
-      yt-dlp \
-      ffmpeg \
-      libsodium \
-      opus
+# nodejs 22  : the bot runtime + the ABI the opus prebuild targets (node-v127)
+# ffmpeg     : prism-media transcode (48k stereo -> 16k mono) + playback
+# yt-dlp     : self-contained static binary (bundles Python) for the target arch
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl xz-utils ffmpeg \
+ && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
+ && case "$(uname -m)" in \
+      aarch64) YTDLP_ASSET=yt-dlp_linux_aarch64 ;; \
+      x86_64)  YTDLP_ASSET=yt-dlp_linux ;; \
+      *) echo "Unsupported arch $(uname -m)" >&2; exit 1 ;; \
+    esac \
+ && curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${YTDLP_ASSET}" \
+      -o /usr/local/bin/yt-dlp \
+ && chmod +x /usr/local/bin/yt-dlp \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/app
 
-# --- Install Node deps (native addons need a build toolchain on musl) -------
+# --- Install Node deps (native addons resolve to glibc prebuilds, no compile) -
+# Full install (incl. dev) so tsc is available for the build below.
 COPY package.json package-lock.json* ./
-RUN apk add --no-cache --virtual .build-deps \
-      python3 make g++ libtool autoconf automake libsodium-dev opus-dev \
- && (npm ci --omit=dev || npm install --omit=dev) \
- && apk del .build-deps
+RUN npm ci
 
-# --- Build the TypeScript -> dist/ -----------------------------------------
-# Bring in tsconfig + sources and compile, then drop dev deps. tsc is a dev
-# dependency, so install the full tree for the build then prune. npm run build
-# also copies the admin assets into dist/.
+# --- Build the TypeScript -> dist/, then drop dev deps ----------------------
+# `npm run build` also copies the admin assets into dist/.
 COPY tsconfig.json ./
 COPY src ./src
-RUN apk add --no-cache --virtual .build-ts python3 make g++ \
- && npm install \
- && npm run build \
+RUN npm run build \
  && npm prune --omit=dev \
- && apk del .build-ts \
  && rm -rf ./src
 
 # --- s6 service definitions + init scripts ---------------------------------
 COPY rootfs /
 
 # Health: nothing to expose besides the ingress port (handled by HA).
-LABEL io.hass.version="0.2.0" \
+LABEL io.hass.version="0.2.1" \
       io.hass.type="addon" \
       io.hass.arch="aarch64|amd64"

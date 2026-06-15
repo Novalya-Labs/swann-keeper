@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.1
+
+Fix the add-on image build on Raspberry Pi (ARM64).
+
+- Switched the base image from Alpine (musl) to the HA **Debian/glibc** base.
+  The native addons (`@discordjs/opus`, `sherpa-onnx-node`,
+  `@picovoice/porcupine-node`) only ship **glibc** prebuilds; on Alpine
+  `@discordjs/opus` has no prebuild and its from-source build fails on ARM64
+  (libopus NEON `celt_inner_prod_neon` error).
+- Pinned **Node 22** (NodeSource): `@discordjs/opus` 0.10.0 publishes prebuilds
+  only up to `node-v127` (Node 22). Alpine 3.23 shipped Node 24 (`node-v137`),
+  which has no prebuild and forced the failing compile.
+- `yt-dlp` is now the self-contained static binary for the target arch; `ffmpeg`
+  comes from apt. No C/C++ toolchain in the image anymore (all prebuilds).
+
 ## 0.2.0
 
 Dropped Lavalink/Java; playback is now fully in-process.
