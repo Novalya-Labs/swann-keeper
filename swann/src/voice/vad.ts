@@ -10,13 +10,13 @@
  *   - mono, 16000 Hz
  *   - Float32 samples in [-1, 1] (we convert int16 -> float32 by /32768)
  *   - window size 512 samples (matches the standard silero_vad.onnx model and
- *     the Porcupine frame size, so one frame feeds both engines).
+ *     the KWS frame size, so one frame feeds both engines).
  *
  * sherpa-onnx-node is a CommonJS native addon; imported via default interop.
  */
 
 import type { Logger } from '../logger.js';
-import type { PicovoiceConfig } from '../config.js';
+import type { VoiceConfig } from '../config.js';
 
 const SAMPLE_RATE = 16000;
 const WINDOW_SIZE = 512;
@@ -111,15 +111,15 @@ export interface UtteranceDetector {
 
 export async function createUtteranceDetector(deps: {
   logger: Logger;
-  picovoice: PicovoiceConfig;
+  voice: VoiceConfig;
 }): Promise<UtteranceDetector> {
-  const { logger, picovoice } = deps;
+  const { logger, voice } = deps;
   const { Vad } = await loadSherpa();
 
   const vad: SherpaVad = new Vad(
     {
       sileroVad: {
-        model: picovoice.sileroVadPath,
+        model: voice.sileroVadPath,
         threshold: 0.5,
         minSpeechDuration: 0.25,
         minSilenceDuration: 0.5,
@@ -130,7 +130,7 @@ export async function createUtteranceDetector(deps: {
     BUFFER_SECONDS,
   );
 
-  logger.debug('Silero VAD detector created', { model: picovoice.sileroVadPath });
+  logger.debug('Silero VAD detector created', { model: voice.sileroVadPath });
 
   const scratch = new Float32Array(WINDOW_SIZE);
 

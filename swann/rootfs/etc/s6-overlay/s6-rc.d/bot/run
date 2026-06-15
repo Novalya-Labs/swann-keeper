@@ -15,7 +15,6 @@ bashio::log.info "Starting Swann bot..."
 # --- Secrets (exported, never echoed) --------------------------------------
 export DISCORD_TOKEN="$(bashio::config 'discord_token')"
 export MISTRAL_API_KEY="$(bashio::config 'mistral_api_key')"
-export PICOVOICE_ACCESS_KEY="$(bashio::config 'picovoice_access_key')"
 
 # --- Discord ---------------------------------------------------------------
 export DISCORD_APP_ID="$(bashio::config 'discord_app_id')"
@@ -25,9 +24,14 @@ export DISCORD_GUILD_ID="$(bashio::config 'discord_guild_id' '')"
 export MISTRAL_CHAT_MODEL="$(bashio::config 'mistral_chat_model')"
 export MISTRAL_TRANSCRIBE_MODEL="$(bashio::config 'mistral_transcribe_model')"
 
-# --- Picovoice / VAD -------------------------------------------------------
-export PICOVOICE_KEYWORD_PATH="$(bashio::config 'picovoice_keyword_path')"
-export PICOVOICE_SENSITIVITY="$(bashio::config 'picovoice_sensitivity')"
+# --- Wake word (sherpa-onnx KWS) / VAD -------------------------------------
+export KWS_ENCODER_PATH="$(bashio::config 'kws_encoder_path')"
+export KWS_DECODER_PATH="$(bashio::config 'kws_decoder_path')"
+export KWS_JOINER_PATH="$(bashio::config 'kws_joiner_path')"
+export KWS_TOKENS_PATH="$(bashio::config 'kws_tokens_path')"
+export KWS_KEYWORDS_PATH="$(bashio::config 'kws_keywords_path')"
+export KWS_THRESHOLD="$(bashio::config 'kws_threshold')"
+export KWS_SCORE="$(bashio::config 'kws_score')"
 export SILERO_VAD_PATH="$(bashio::config 'silero_vad_path')"
 
 # --- Media (yt-dlp / ffmpeg) -----------------------------------------------

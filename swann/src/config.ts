@@ -34,10 +34,19 @@ export interface MistralConfig {
   readonly transcribeModel: string;
 }
 
-export interface PicovoiceConfig {
-  readonly accessKey: string;
-  readonly keywordPath: string;
-  readonly sensitivity: number;
+export interface VoiceConfig {
+  /** sherpa-onnx streaming-transducer KWS model files. */
+  readonly kwsEncoderPath: string;
+  readonly kwsDecoderPath: string;
+  readonly kwsJoinerPath: string;
+  readonly kwsTokensPath: string;
+  /** Tokenized keywords file (the "Swann" line, encoded for the model). */
+  readonly kwsKeywordsPath: string;
+  /** Detection threshold 0..1 (lower = more sensitive / more false fires). */
+  readonly kwsThreshold: number;
+  /** Per-keyword score boost (raises recall for a specific keyword). */
+  readonly kwsScore: number;
+  /** Silero VAD model path (utterance capture after the wake word). */
   readonly sileroVadPath: string;
 }
 
@@ -70,7 +79,7 @@ export interface Config {
   readonly isHomeAssistant: boolean;
   readonly discord: DiscordConfig;
   readonly mistral: MistralConfig;
-  readonly picovoice: PicovoiceConfig;
+  readonly voice: VoiceConfig;
   readonly media: MediaConfig;
   readonly admin: AdminConfig;
   readonly behaviour: BehaviourConfig;
@@ -84,9 +93,13 @@ interface HaOptions {
   mistral_api_key?: string;
   mistral_chat_model?: string;
   mistral_transcribe_model?: string;
-  picovoice_access_key?: string;
-  picovoice_keyword_path?: string;
-  picovoice_sensitivity?: number;
+  kws_encoder_path?: string;
+  kws_decoder_path?: string;
+  kws_joiner_path?: string;
+  kws_tokens_path?: string;
+  kws_keywords_path?: string;
+  kws_threshold?: number;
+  kws_score?: number;
   silero_vad_path?: string;
   ytdlp_path?: string;
   ytdlp_format?: string;
@@ -156,11 +169,15 @@ function build(): Config {
       chatModel: pick(ha?.mistral_chat_model, env.MISTRAL_CHAT_MODEL, 'mistral-medium-3-5'),
       transcribeModel: pick(ha?.mistral_transcribe_model, env.MISTRAL_TRANSCRIBE_MODEL, 'voxtral-mini-latest'),
     },
-    picovoice: {
-      accessKey: pick(ha?.picovoice_access_key, env.PICOVOICE_ACCESS_KEY),
-      keywordPath: pick(ha?.picovoice_keyword_path, env.PICOVOICE_KEYWORD_PATH, '/data/Swann_en_raspberry-pi_v3_0_0.ppn'),
-      sensitivity: clamp(num(ha?.picovoice_sensitivity ?? env.PICOVOICE_SENSITIVITY, 0.6), 0, 1),
-      sileroVadPath: pick(ha?.silero_vad_path, env.SILERO_VAD_PATH, '/data/silero_vad.onnx'),
+    voice: {
+      kwsEncoderPath: pick(ha?.kws_encoder_path, env.KWS_ENCODER_PATH, '/config/kws/encoder.onnx'),
+      kwsDecoderPath: pick(ha?.kws_decoder_path, env.KWS_DECODER_PATH, '/config/kws/decoder.onnx'),
+      kwsJoinerPath: pick(ha?.kws_joiner_path, env.KWS_JOINER_PATH, '/config/kws/joiner.onnx'),
+      kwsTokensPath: pick(ha?.kws_tokens_path, env.KWS_TOKENS_PATH, '/config/kws/tokens.txt'),
+      kwsKeywordsPath: pick(ha?.kws_keywords_path, env.KWS_KEYWORDS_PATH, '/config/kws/keywords.txt'),
+      kwsThreshold: clamp(num(ha?.kws_threshold ?? env.KWS_THRESHOLD, 0.25), 0, 1),
+      kwsScore: num(ha?.kws_score ?? env.KWS_SCORE, 1.0),
+      sileroVadPath: pick(ha?.silero_vad_path, env.SILERO_VAD_PATH, '/config/silero_vad.onnx'),
     },
     media: {
       ytdlpPath: pick(ha?.ytdlp_path, env.YTDLP_PATH, 'yt-dlp'),
@@ -183,7 +200,6 @@ function build(): Config {
   // Register every secret with the logger so it can never be printed.
   registerSecret(config.discord.token);
   registerSecret(config.mistral.apiKey);
-  registerSecret(config.picovoice.accessKey);
 
   setLogLevel(config.behaviour.logLevel);
 
@@ -202,13 +218,11 @@ export function configStatus(): {
   discordToken: boolean;
   discordAppId: boolean;
   mistralApiKey: boolean;
-  picovoiceAccessKey: boolean;
 } {
   return {
     discordToken: config.discord.token.length > 0,
     discordAppId: config.discord.appId.length > 0,
     mistralApiKey: config.mistral.apiKey.length > 0,
-    picovoiceAccessKey: config.picovoice.accessKey.length > 0,
   };
 }
 

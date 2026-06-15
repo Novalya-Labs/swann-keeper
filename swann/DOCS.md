@@ -18,9 +18,10 @@ manage it individually.
   `amd64`.
 - A Discord application + bot (token and application ID).
 - A Mistral AI API key.
-- A Picovoice access key and a trained **"Swann"** wake-word file, plus the
-  Silero VAD model (only required if you want **voice** control; text control
-  works without them).
+- For **voice** control only (text works without any of this): a sherpa-onnx
+  **keyword-spotting (KWS)** model, a tokenized **"Swann"** keywords file, and
+  the Silero VAD model. All run on-device — no account, no API key, no online
+  activation (this replaces the old Picovoice/Porcupine dependency).
 
 ## Installation
 
@@ -34,15 +35,42 @@ manage it individually.
 
 ## Model and cookie files
 
-Place the following in the add-on's `/config` directory (it appears at `/data/`
-inside the container, which is why the defaults point there):
+Place files in the add-on's config directory. With the `addon_config` mapping
+that folder is `/addon_configs/swann/` on the host (reachable via the **Samba**
+or **File editor** add-on) and is mounted at **`/config`** inside the container —
+which is why the defaults point at `/config`.
 
-- The trained `.ppn` **"Swann"** keyword file (built for the **Raspberry Pi**
-  platform in the Picovoice Console) — required for voice.
-- `silero_vad.onnx` (from the sherpa-onnx releases) — required for voice.
-- Optionally, a Netscape-format `cookies.txt` for yt-dlp, to bypass age/region
-  gates or YouTube rate-limits. Point `ytdlp_cookies_path` at it (e.g.
-  `/data/cookies.txt`).
+For **voice** (all optional; skip entirely for text-only use):
+
+1. **Silero VAD** — download `silero_vad.onnx` from the sherpa-onnx releases and
+   place it at `/config/silero_vad.onnx`.
+2. **Wake-word KWS model** — download an English streaming KWS model, e.g.
+   `sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01`
+   (<https://github.com/k2-fsa/sherpa-onnx/releases>). Extract it and place the
+   files under `/config/kws/`, renaming the three ONNX files so they match the
+   defaults:
+   - `encoder.onnx`, `decoder.onnx`, `joiner.onnx`
+   - `tokens.txt`
+3. **Keywords file** — `/config/kws/keywords.txt` must contain the **"Swann"**
+   keyword **encoded as model tokens** (not plain text). Generate it once with
+   the model's BPE tokenizer using sherpa-onnx's `text2token`:
+
+   ```bash
+   # from a checkout of sherpa-onnx, using the model's bpe.model:
+   python3 ./scripts/text2token.py \
+     --tokens /config/kws/tokens.txt \
+     --tokens-type bpe \
+     --bpe-model /path/to/bpe.model \
+     --input  - --output /config/kws/keywords.txt <<< "SWANN @swann"
+   ```
+
+   The resulting line looks like `▁S W ANN :swann` (exact tokens depend on the
+   model). Lower `kws_threshold` (e.g. `0.15`) or raise `kws_score` if "Swann"
+   is missed; raise the threshold if it false-fires.
+
+Optionally, a Netscape-format `cookies.txt` for yt-dlp (to bypass age/region
+gates or YouTube rate-limits): place it at `/config/cookies.txt` and point
+`ytdlp_cookies_path` at it.
 
 ## Configuration
 
@@ -70,14 +98,21 @@ if you use `text_wake_phrase`.
 | `mistral_chat_model` | no | `mistral-medium-3-5` |
 | `mistral_transcribe_model` | no | `voxtral-mini-latest` |
 
-### Picovoice (voice / wake word)
+### Wake word (sherpa-onnx KWS) / VAD — voice only
+
+On-device keyword spotting; no account or API key. All paths default under
+`/config` (see "Model and cookie files").
 
 | Option | Required for voice | Default |
 | --- | --- | --- |
-| `picovoice_access_key` | yes | — |
-| `picovoice_keyword_path` | yes | `/data/Swann_en_raspberry-pi_v3_0_0.ppn` |
-| `picovoice_sensitivity` | no | `0.6` |
-| `silero_vad_path` | yes | `/data/silero_vad.onnx` |
+| `kws_encoder_path` | yes | `/config/kws/encoder.onnx` |
+| `kws_decoder_path` | yes | `/config/kws/decoder.onnx` |
+| `kws_joiner_path` | yes | `/config/kws/joiner.onnx` |
+| `kws_tokens_path` | yes | `/config/kws/tokens.txt` |
+| `kws_keywords_path` | yes | `/config/kws/keywords.txt` |
+| `kws_threshold` | no | `0.25` (lower = more sensitive) |
+| `kws_score` | no | `1.0` (per-keyword boost) |
+| `silero_vad_path` | yes | `/config/silero_vad.onnx` |
 
 ### Playback (yt-dlp / ffmpeg)
 
@@ -127,10 +162,12 @@ authentication — Swann adds no login of its own.
 ## Troubleshooting
 
 - **Add-on won't build:** ensure your HA is on a recent Supervisor and the host
-  is 64-bit. The build compiles native modules; a low-RAM device can be slow.
-- **No voice detection:** confirm the `.ppn` and `silero_vad.onnx` files exist
-  at the configured paths and the `.ppn` was trained for the Raspberry Pi /
-  Linux platform.
+  is 64-bit. The image pulls native prebuilds (no compilation).
+- **No voice detection:** confirm the KWS model files (`encoder.onnx`,
+  `decoder.onnx`, `joiner.onnx`, `tokens.txt`), the tokenized `keywords.txt`, and
+  `silero_vad.onnx` all exist at the configured `/config` paths. The admin UI's
+  "Wake-word model (KWS)" / "Silero VAD model" rows show presence. If "Swann" is
+  missed, lower `kws_threshold` (e.g. `0.15`); if it false-fires, raise it.
 - **YouTube errors ("sign in to confirm…"):** YouTube may rate-limit the host
   IP. Supplying a `cookies.txt` (`ytdlp_cookies_path`) or updating the add-on
   (which refreshes the bundled `yt-dlp`) usually resolves it.

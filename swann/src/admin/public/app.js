@@ -146,8 +146,7 @@
     discordToken: 'Discord token',
     discordAppId: 'Discord app id',
     mistralApiKey: 'Mistral API key',
-    picovoiceAccessKey: 'Picovoice access key',
-    picovoiceKeyword: 'Picovoice keyword file',
+    kwsModel: 'Wake-word model (KWS)',
     sileroModel: 'Silero VAD model',
     ytdlpAvailable: 'yt-dlp available',
   };

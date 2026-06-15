@@ -2,7 +2,7 @@
  * Swann — per-user Discord voice receive pipeline.
  *
  * Discord voice receive is ALWAYS 48kHz stereo Opus, frameSize 960. To feed
- * Porcupine + Silero (both want 16kHz mono int16, 512-sample frames) we:
+ * the KWS spotter + Silero (both want 16kHz mono int16, 512-sample frames) we:
  *
  *   opus packets
  *     -> prism.opus.Decoder({rate:48000, channels:2, frameSize:960})  // 48k stereo s16le

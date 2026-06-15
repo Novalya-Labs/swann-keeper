@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+Replace Picovoice/Porcupine with an on-device, open-source wake word.
+
+- Wake-word detection now uses **sherpa-onnx KeywordSpotter** (the same ONNX
+  runtime already used for the Silero VAD) — fully local, no account, no API
+  key, no online activation. Removes the `@picovoice/porcupine-node` dependency.
+- New options replace the `picovoice_*` ones: `kws_encoder_path`,
+  `kws_decoder_path`, `kws_joiner_path`, `kws_tokens_path`, `kws_keywords_path`,
+  `kws_threshold`, `kws_score`. Model files live under `/config/kws/` (see DOCS).
+- Model-file paths now default under **`/config`** (the `addon_config` mount)
+  instead of `/data`, matching where you drop files via Samba/File editor.
+- Text control is unchanged and still needs none of the above.
+
 ## 0.2.2
 
 Use the Debian **bullseye** base (glibc 2.31) so the opus prebuild matches.

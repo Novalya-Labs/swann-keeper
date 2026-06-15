@@ -106,7 +106,7 @@ export async function startBot(): Promise<void> {
   // --- voice (wake word + VAD + transcription) -----------------------------
   const voice = createVoiceListener({
     logger,
-    picovoice: config.picovoice,
+    voice: config.voice,
     transcriber,
   });
 
@@ -121,10 +121,9 @@ export async function startBot(): Promise<void> {
         discordToken: status.discordToken,
         discordAppId: status.discordAppId,
         mistralApiKey: status.mistralApiKey,
-        picovoiceAccessKey: status.picovoiceAccessKey,
-        // Reflect whether the user actually dropped the model files into /data.
-        picovoiceKeyword: existsSync(config.picovoice.keywordPath),
-        sileroModel: existsSync(config.picovoice.sileroVadPath),
+        // Reflect whether the user actually dropped the model files into /config.
+        kwsModel: existsSync(config.voice.kwsEncoderPath) && existsSync(config.voice.kwsKeywordsPath),
+        sileroModel: existsSync(config.voice.sileroVadPath),
         ytdlpAvailable,
       };
     },

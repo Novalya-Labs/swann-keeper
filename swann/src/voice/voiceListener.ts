@@ -3,10 +3,10 @@
  *
  * Per guild, given a (selfDeaf:false) VoiceConnection handed over by the
  * discord module, this:
- *   1. owns one Porcupine wake-word engine + one Silero VAD detector,
+ *   1. owns one sherpa-onnx KWS wake-word engine + one Silero VAD detector,
  *   2. on each `receiver.speaking 'start'` spins up a per-user receive pipeline
  *      (Opus -> 16k mono int16 512-sample frames),
- *   3. while idle, runs every frame through Porcupine ("Swann"),
+ *   3. while idle, runs every frame through the KWS spotter ("Swann"),
  *   4. once "Swann" fires, switches that guild into CAPTURE mode and feeds
  *      subsequent frames to Silero VAD until trailing silence ends the
  *      utterance,
@@ -25,7 +25,7 @@ import type {
   Transcriber,
 } from '../types.js';
 import type { Logger } from '../logger.js';
-import type { PicovoiceConfig } from '../config.js';
+import type { VoiceConfig } from '../config.js';
 import { createWakeWordEngine, type WakeWordEngine } from './wakeWord.js';
 import { createUtteranceDetector, type UtteranceDetector, VAD_SAMPLE_RATE } from './vad.js';
 import { startUserPipeline, type UserPipeline } from './receivePipeline.js';
@@ -70,7 +70,7 @@ class VoiceListenerImpl implements VoiceListener {
 
   constructor(
     private readonly logger: Logger,
-    private readonly picovoice: PicovoiceConfig,
+    private readonly voice: VoiceConfig,
     private readonly transcriber: Transcriber,
     private readonly language: string | undefined,
   ) {}
@@ -93,8 +93,8 @@ class VoiceListenerImpl implements VoiceListener {
 
   private async initGuild(guildId: string, voiceChannelId: string, receiver: VoiceReceiver): Promise<void> {
     const [wake, vad] = await Promise.all([
-      createWakeWordEngine({ logger: this.logger.child('wake'), picovoice: this.picovoice }),
-      createUtteranceDetector({ logger: this.logger.child('vad'), picovoice: this.picovoice }),
+      createWakeWordEngine({ logger: this.logger.child('wake'), voice: this.voice }),
+      createUtteranceDetector({ logger: this.logger.child('vad'), voice: this.voice }),
     ]);
 
     const state: GuildState = {
@@ -275,13 +275,13 @@ function float32ToPcm16le(samples: Float32Array): Buffer {
  */
 export function createVoiceListener(deps: {
   logger: Logger;
-  picovoice: PicovoiceConfig;
+  voice: VoiceConfig;
   transcriber: Transcriber;
   language?: string;
 }): VoiceListener {
   return new VoiceListenerImpl(
     deps.logger.child('voice'),
-    deps.picovoice,
+    deps.voice,
     deps.transcriber,
     deps.language,
   );

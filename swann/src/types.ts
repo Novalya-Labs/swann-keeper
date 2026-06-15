@@ -352,7 +352,7 @@ export interface VoiceListenerEvents extends EventEmitter {
 }
 
 /**
- * The voice receive pipeline: per-user Opus->16k mono PCM, Porcupine wake
+ * The voice receive pipeline: per-user Opus->16k mono PCM, KWS wake
  * word, Silero VAD utterance capture, then transcription via the injected
  * Transcriber. Emits VoiceCommandEvent.
  *
@@ -414,8 +414,8 @@ export interface ConfigStatus {
   readonly discordToken: boolean;
   readonly discordAppId: boolean;
   readonly mistralApiKey: boolean;
-  readonly picovoiceAccessKey: boolean;
-  readonly picovoiceKeyword: boolean;
+  /** Wake-word KWS model + tokenized keywords file both present. */
+  readonly kwsModel: boolean;
   readonly sileroModel: boolean;
   /** Whether the yt-dlp binary is available on PATH (media backend health). */
   readonly ytdlpAvailable: boolean;
