@@ -14,8 +14,14 @@
 # Node is pinned to 22 (NodeSource): @discordjs/opus 0.10.0 publishes prebuilds
 # only up to node-v127 (Node 22). Node 24 (node-v137) has NO prebuild and would
 # force the failing source compile.
+#
+# Base is Debian *bullseye* (glibc 2.31), NOT bookworm. @discordjs/node-pre-gyp
+# matches the glibc version EXACTLY in the prebuild filename: opus 0.10.0 ships
+# arm64 prebuilds for glibc-2.31 and glibc-2.35 only. Bookworm is glibc-2.36 ->
+# no asset -> falls back to the failing source compile. Bullseye = 2.31 -> exact
+# match -> the prebuild downloads, no compile.
 # =============================================================================
-ARG BUILD_FROM=ghcr.io/home-assistant/aarch64-base-debian:bookworm
+ARG BUILD_FROM=ghcr.io/home-assistant/aarch64-base-debian:bullseye
 FROM ${BUILD_FROM}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -59,6 +65,6 @@ RUN npm run build \
 COPY rootfs /
 
 # Health: nothing to expose besides the ingress port (handled by HA).
-LABEL io.hass.version="0.2.1" \
+LABEL io.hass.version="0.2.2" \
       io.hass.type="addon" \
       io.hass.arch="aarch64|amd64"

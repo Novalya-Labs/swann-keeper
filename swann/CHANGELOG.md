@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.2
+
+Use the Debian **bullseye** base (glibc 2.31) so the opus prebuild matches.
+
+- `@discordjs/node-pre-gyp` matches the glibc version **exactly** in the prebuild
+  filename. `@discordjs/opus` 0.10.0 ships arm64 prebuilds for `glibc-2.31` and
+  `glibc-2.35` only. Bookworm (0.2.1) is glibc-2.36 → no asset → it fell back to
+  the failing source compile. Bullseye is glibc-2.31 → exact match → the prebuild
+  downloads, no compilation.
+
 ## 0.2.1
 
 Fix the add-on image build on Raspberry Pi (ARM64).

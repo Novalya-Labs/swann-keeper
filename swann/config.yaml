@@ -11,7 +11,7 @@
 # values to /data/options.json on every start.
 # =============================================================================
 name: "Swann"
-version: "0.2.1"
+version: "0.2.2"
 slug: "swann"
 description: >-
   Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
