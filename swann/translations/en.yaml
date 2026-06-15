@@ -1,0 +1,87 @@
+---
+configuration:
+  discord_token:
+    name: "Discord bot token"
+    description: >-
+      Bot token from the Discord Developer Portal (Bot > Token). Keep secret.
+  discord_app_id:
+    name: "Discord application ID"
+    description: >-
+      Application (client) ID, used to register slash commands.
+  discord_guild_id:
+    name: "Discord guild ID (optional)"
+    description: >-
+      A server ID for instant guild-scoped slash command registration. Leave
+      empty to register commands globally (can take up to 1 hour to appear).
+  mistral_api_key:
+    name: "Mistral API key"
+    description: >-
+      API key used for the natural-language agent (function calling) and Voxtral
+      voice transcription. Keep secret.
+  mistral_chat_model:
+    name: "Mistral chat model"
+    description: "Model id for the agentic tool-calling loop."
+  mistral_transcribe_model:
+    name: "Voxtral transcription model"
+    description: "Model id used to transcribe captured voice commands."
+  picovoice_access_key:
+    name: "Picovoice access key"
+    description: >-
+      AccessKey from console.picovoice.ai, required for the 'Swann' wake word.
+      Keep secret.
+  picovoice_keyword_path:
+    name: "Wake-word keyword file path"
+    description: >-
+      Path to the trained 'Swann' .ppn keyword file (Raspberry Pi platform).
+      Place the file in /config (mapped to /data) of this add-on.
+  picovoice_sensitivity:
+    name: "Wake-word sensitivity"
+    description: >-
+      Detection sensitivity 0..1. Higher catches more, with more false hits.
+  silero_vad_path:
+    name: "Silero VAD model path"
+    description: "Path to silero_vad.onnx used by sherpa-onnx for end-of-speech."
+  ytdlp_path:
+    name: "yt-dlp binary path (optional)"
+    description: >-
+      Path or name of the yt-dlp binary used to resolve searches and audio
+      streams. Defaults to 'yt-dlp' (the binary baked into the add-on image).
+  ytdlp_format:
+    name: "yt-dlp format selector (optional)"
+    description: >-
+      yt-dlp -f format selector for audio extraction. Defaults to
+      'bestaudio[ext=webm]/bestaudio/best'.
+  ytdlp_cookies_path:
+    name: "yt-dlp cookies file path (optional)"
+    description: >-
+      Optional Netscape-format cookies.txt to bypass age/region gates or
+      rate-limits. Place it in /config (mapped to /data) and point here, e.g.
+      /data/cookies.txt. Leave empty to disable.
+  search_limit_max:
+    name: "Max search results (optional)"
+    description: >-
+      Maximum number of results a single search or playlist request may
+      resolve (1..50). Defaults to 25.
+  ingress_port:
+    name: "Admin UI ingress port"
+    description: "Port the admin web UI binds to. Keep at 8099 for Ingress."
+  admin_bind_address:
+    name: "Admin bind address"
+    description: "Bind address for the admin server. Keep 0.0.0.0 for Ingress."
+  admin_ingress_only:
+    name: "Restrict admin UI to Ingress"
+    description: >-
+      When enabled, only the Home Assistant Ingress gateway (172.30.32.2) may
+      reach the admin UI. Recommended.
+  log_level:
+    name: "Log level"
+    description: "Verbosity: trace, debug, info, warning, or error."
+  text_wake_phrase:
+    name: "Text wake phrase"
+    description: >-
+      Chat phrase that routes a message to the natural-language agent
+      (e.g. 'Hey Swann play some jazz').
+  default_volume:
+    name: "Default volume"
+    description: "Default playback volume 0..100."
+network: {}

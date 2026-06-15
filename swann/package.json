@@ -1,0 +1,39 @@
+{
+  "name": "swann",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Swann — a Discord music bot that plays via Lavalink, understands natural-language requests in text and voice (Mistral function-calling + Voxtral), detects the \"Swann\" wake word with Picovoice Porcupine, and ships as a Home Assistant add-on with an Ingress admin UI.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && rm -rf dist/admin/public && mkdir -p dist/admin && cp -R src/admin/public dist/admin/public",
+    "start": "node dist/index.js",
+    "dev": "node --watch --enable-source-maps --loader ts-node/esm src/index.ts",
+    "register": "node --enable-source-maps --loader ts-node/esm src/discord/register.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@discordjs/opus": "0.10.0",
+    "@discordjs/rest": "2.6.1",
+    "@discordjs/voice": "0.19.2",
+    "@fastify/static": "8.2.0",
+    "@mistralai/mistralai": "2.2.1",
+    "@picovoice/porcupine-node": "4.0.2",
+    "discord-api-types": "0.38.48",
+    "discord.js": "14.26.4",
+    "fastify": "5.6.1",
+    "libsodium-wrappers": "0.8.4",
+    "prism-media": "1.3.5",
+    "sherpa-onnx-node": "1.13.2"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers": "0.7.14",
+    "@types/node": "22.15.3",
+    "ts-node": "10.9.2",
+    "typescript": "^5.8.3"
+  }
+}

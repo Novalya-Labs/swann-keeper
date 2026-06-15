@@ -1,0 +1,51 @@
+#!/usr/bin/with-contenv bashio
+# =============================================================================
+# s6 longrun: the Swann Node bot (the only service in this container).
+#
+# src/config.ts reads /data/options.json directly (HA options take priority),
+# so exporting env vars is belt-and-suspenders — it keeps the env path coherent
+# and lets the Supervisor-injected SUPERVISOR_TOKEN flow through. Secrets are
+# never echoed here; the logger redacts registered secrets at runtime.
+#
+# Playback is @discordjs/voice + yt-dlp + ffmpeg (binaries baked into the
+# image) — there is no Lavalink to wait for.
+# =============================================================================
+bashio::log.info "Starting Swann bot..."
+
+# --- Secrets (exported, never echoed) --------------------------------------
+export DISCORD_TOKEN="$(bashio::config 'discord_token')"
+export MISTRAL_API_KEY="$(bashio::config 'mistral_api_key')"
+export PICOVOICE_ACCESS_KEY="$(bashio::config 'picovoice_access_key')"
+
+# --- Discord ---------------------------------------------------------------
+export DISCORD_APP_ID="$(bashio::config 'discord_app_id')"
+export DISCORD_GUILD_ID="$(bashio::config 'discord_guild_id' '')"
+
+# --- Mistral ---------------------------------------------------------------
+export MISTRAL_CHAT_MODEL="$(bashio::config 'mistral_chat_model')"
+export MISTRAL_TRANSCRIBE_MODEL="$(bashio::config 'mistral_transcribe_model')"
+
+# --- Picovoice / VAD -------------------------------------------------------
+export PICOVOICE_KEYWORD_PATH="$(bashio::config 'picovoice_keyword_path')"
+export PICOVOICE_SENSITIVITY="$(bashio::config 'picovoice_sensitivity')"
+export SILERO_VAD_PATH="$(bashio::config 'silero_vad_path')"
+
+# --- Media (yt-dlp / ffmpeg) -----------------------------------------------
+export YTDLP_PATH="$(bashio::config 'ytdlp_path' '')"
+export YTDLP_FORMAT="$(bashio::config 'ytdlp_format' '')"
+export YTDLP_COOKIES_PATH="$(bashio::config 'ytdlp_cookies_path' '')"
+export SEARCH_LIMIT_MAX="$(bashio::config 'search_limit_max' '')"
+
+# --- Admin UI --------------------------------------------------------------
+export INGRESS_PORT="$(bashio::config 'ingress_port')"
+export ADMIN_BIND_ADDRESS="$(bashio::config 'admin_bind_address')"
+export ADMIN_INGRESS_ONLY="$(bashio::config 'admin_ingress_only')"
+
+# --- Behaviour -------------------------------------------------------------
+export LOG_LEVEL="$(bashio::config 'log_level')"
+export TEXT_WAKE_PHRASE="$(bashio::config 'text_wake_phrase')"
+export DEFAULT_VOLUME="$(bashio::config 'default_volume')"
+
+cd /opt/app || bashio::exit.nok "Cannot enter /opt/app"
+
+exec node /opt/app/dist/index.js

@@ -1,0 +1,9 @@
+---
+# Explicit per-arch base images. Required since Supervisor 2026.04.0 no longer
+# injects a default BUILD_FROM. The HA Alpine base ships s6-overlay v3 + bashio.
+build_from:
+  aarch64: ghcr.io/home-assistant/base:3.23
+  amd64: ghcr.io/home-assistant/base:3.23
+labels:
+  org.opencontainers.image.title: "Swann"
+  org.opencontainers.image.source: "https://github.com/Novalya-Labs/swann-keeper"

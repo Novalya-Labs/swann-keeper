@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!--BASE_HREF-->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Swann — Admin</title>
+    <!-- All asset URLs are RELATIVE so the injected <base href> makes them
+         resolve correctly both directly (dev) and behind HA Ingress. -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1><span class="logo">♪</span> Swann</h1>
+      <div class="status">
+        <span id="conn" class="pill pill-muted">connecting…</span>
+        <span id="uptime" class="muted"></span>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel" id="players-panel">
+        <h2>Players</h2>
+        <div id="players" class="players">
+          <p class="muted">Loading…</p>
+        </div>
+      </section>
+
+      <div class="two-col">
+        <section class="panel">
+          <h2>Credentials</h2>
+          <ul id="credentials" class="creds">
+            <li class="muted">Loading…</li>
+          </ul>
+          <p class="hint">
+            Values are never shown — only whether each credential is configured.
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>Activity</h2>
+          <ul id="activity" class="activity">
+            <li class="muted">Loading…</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+
+    <!-- Relative src; resolved via <base href>. -->
+    <script src="app.js"></script>
+  </body>
+</html>

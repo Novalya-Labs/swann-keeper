@@ -1,0 +1,88 @@
+---
+# =============================================================================
+# Swann — Home Assistant add-on manifest.
+#
+# Runs ONLY the Node bot in a single container, supervised by s6-overlay (do
+# NOT set init:false). Playback is @discordjs/voice + yt-dlp + ffmpeg (no
+# Lavalink, no JVM). Exposes an Ingress-only admin web UI.
+#
+# The option keys below are snake_case and MUST mirror exactly the keys read by
+# src/config.ts (loadHaOptions / HaOptions). The Supervisor writes the resolved
+# values to /data/options.json on every start.
+# =============================================================================
+name: "Swann"
+version: "0.2.0"
+slug: "swann"
+description: >-
+  Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
+  control (Mistral function-calling + Voxtral) and a "Swann" wake word, plus an
+  Ingress admin web UI.
+url: "https://github.com/Novalya-Labs/swann-keeper"
+# Raspberry Pi 5 is aarch64; amd64 kept for portability / testing.
+arch:
+  - aarch64
+  - amd64
+
+# Let s6-overlay (from the base image) supervise the single longrun service.
+# init: false is intentionally NOT set.
+
+# --- Ingress web admin UI --------------------------------------------------
+ingress: true
+ingress_port: 8099
+ingress_entry: "/"
+panel_icon: "mdi:music"
+panel_title: "Swann"
+panel_admin: true
+
+# --- Supervisor API (read own options at runtime if needed) ----------------
+hassio_api: true
+
+# Persistent volume /data holds /data/options.json plus user-supplied model
+# files (the trained .ppn keyword and silero_vad.onnx).
+map:
+  - "addon_config:rw"
+
+# --- User-editable options (rendered in the HA Configuration tab) -----------
+options:
+  discord_token: ""
+  discord_app_id: ""
+  discord_guild_id: ""
+  mistral_api_key: ""
+  mistral_chat_model: "mistral-medium-3-5"
+  mistral_transcribe_model: "voxtral-mini-latest"
+  picovoice_access_key: ""
+  picovoice_keyword_path: "/data/Swann_en_raspberry-pi_v3_0_0.ppn"
+  picovoice_sensitivity: 0.6
+  silero_vad_path: "/data/silero_vad.onnx"
+  ytdlp_path: "yt-dlp"
+  ytdlp_format: "bestaudio[ext=webm]/bestaudio/best"
+  ytdlp_cookies_path: ""
+  search_limit_max: 25
+  ingress_port: 8099
+  admin_bind_address: "0.0.0.0"
+  admin_ingress_only: true
+  log_level: "info"
+  text_wake_phrase: "Hey Swann"
+  default_volume: 80
+
+schema:
+  discord_token: "password"
+  discord_app_id: "str"
+  discord_guild_id: "str?"
+  mistral_api_key: "password"
+  mistral_chat_model: "str"
+  mistral_transcribe_model: "str"
+  picovoice_access_key: "password"
+  picovoice_keyword_path: "str"
+  picovoice_sensitivity: "float(0,1)"
+  silero_vad_path: "str"
+  ytdlp_path: "str?"
+  ytdlp_format: "str?"
+  ytdlp_cookies_path: "str?"
+  search_limit_max: "int(1,50)?"
+  ingress_port: "port"
+  admin_bind_address: "str"
+  admin_ingress_only: "bool"
+  log_level: "list(trace|debug|info|warning|error)"
+  text_wake_phrase: "str"
+  default_volume: "int(0,100)"

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Home Assistant add-on runtime data (Supervisor writes /data/options.json)
+data/
+**/options.json
+
+# Lavalink runtime artifacts
+lavalink/plugins/
+lavalink/logs/
+lavalink/Lavalink.jar
+
+# Picovoice / model assets fetched at deploy time
+*.ppn
+silero_vad.onnx
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

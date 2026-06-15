@@ -1,0 +1,227 @@
+/**
+ * Swann — centralized, typed configuration loader.
+ *
+ * Resolution order (highest priority first):
+ *   1. /data/options.json   (Home Assistant Supervisor add-on options)
+ *   2. process.env          (.env in dev, or env injected by s6 run scripts)
+ *   3. built-in defaults
+ *
+ * HA add-on option keys are snake_case (see haos config.yaml schema); env
+ * vars are SCREAMING_SNAKE. Both are mapped here so the rest of the code only
+ * ever reads the strongly-typed `config` object.
+ *
+ * Secrets are registered with the logger so they can never be printed.
+ * Nothing in this module logs a secret value.
+ */
+
+import { existsSync, readFileSync } from 'node:fs';
+import type { LogLevel } from './logger.js';
+import { registerSecret, setLogLevel, logger } from './logger.js';
+
+/** Path the HA Supervisor writes resolved add-on options to. */
+const HA_OPTIONS_PATH = '/data/options.json';
+
+export interface DiscordConfig {
+  readonly token: string;
+  readonly appId: string;
+  /** Empty string => register slash commands globally. */
+  readonly guildId: string;
+}
+
+export interface MistralConfig {
+  readonly apiKey: string;
+  readonly chatModel: string;
+  readonly transcribeModel: string;
+}
+
+export interface PicovoiceConfig {
+  readonly accessKey: string;
+  readonly keywordPath: string;
+  readonly sensitivity: number;
+  readonly sileroVadPath: string;
+}
+
+export interface MediaConfig {
+  /** Path/name of the yt-dlp binary (on PATH inside the add-on container). */
+  readonly ytdlpPath: string;
+  /** yt-dlp format selector for audio extraction. */
+  readonly ytdlpFormat: string;
+  /** Optional cookies.txt path to bypass age/region gates (empty = none). */
+  readonly cookiesPath: string;
+  /** Max number of results a single search/playlist request may resolve. */
+  readonly searchLimitMax: number;
+}
+
+export interface AdminConfig {
+  readonly ingressPort: number;
+  readonly bindAddress: string;
+  /** When true, only accept requests from the HA Ingress gateway. */
+  readonly ingressOnly: boolean;
+}
+
+export interface BehaviourConfig {
+  readonly logLevel: LogLevel;
+  readonly textWakePhrase: string;
+  readonly defaultVolume: number;
+}
+
+export interface Config {
+  /** True when running inside a Home Assistant add-on container. */
+  readonly isHomeAssistant: boolean;
+  readonly discord: DiscordConfig;
+  readonly mistral: MistralConfig;
+  readonly picovoice: PicovoiceConfig;
+  readonly media: MediaConfig;
+  readonly admin: AdminConfig;
+  readonly behaviour: BehaviourConfig;
+}
+
+/** Raw HA options.json shape (snake_case). All optional / best-effort. */
+interface HaOptions {
+  discord_token?: string;
+  discord_app_id?: string;
+  discord_guild_id?: string;
+  mistral_api_key?: string;
+  mistral_chat_model?: string;
+  mistral_transcribe_model?: string;
+  picovoice_access_key?: string;
+  picovoice_keyword_path?: string;
+  picovoice_sensitivity?: number;
+  silero_vad_path?: string;
+  ytdlp_path?: string;
+  ytdlp_format?: string;
+  ytdlp_cookies_path?: string;
+  search_limit_max?: number;
+  ingress_port?: number;
+  admin_bind_address?: string;
+  admin_ingress_only?: boolean;
+  log_level?: string;
+  text_wake_phrase?: string;
+  default_volume?: number;
+}
+
+function loadHaOptions(): HaOptions | null {
+  if (!existsSync(HA_OPTIONS_PATH)) return null;
+  try {
+    return JSON.parse(readFileSync(HA_OPTIONS_PATH, 'utf8')) as HaOptions;
+  } catch (err) {
+    logger.warn('Failed to parse /data/options.json; falling back to env', err);
+    return null;
+  }
+}
+
+const VALID_LEVELS: ReadonlySet<string> = new Set(['trace', 'debug', 'info', 'warning', 'error']);
+
+function asLevel(value: string | undefined, fallback: LogLevel): LogLevel {
+  return value && VALID_LEVELS.has(value) ? (value as LogLevel) : fallback;
+}
+
+function num(value: unknown, fallback: number): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function bool(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.toLowerCase() === 'true';
+  return fallback;
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/** Build the immutable config from HA options + env + defaults. */
+function build(): Config {
+  const ha = loadHaOptions();
+  const env = process.env;
+  const isHomeAssistant = ha !== null || !!env.SUPERVISOR_TOKEN;
+
+  // Helper: HA option wins, then env, then default.
+  const pick = (haVal: unknown, envVal: string | undefined, def = ''): string => {
+    if (haVal !== undefined && haVal !== null && `${haVal}` !== '') return `${haVal}`;
+    if (envVal !== undefined && envVal !== '') return envVal;
+    return def;
+  };
+
+  const config: Config = {
+    isHomeAssistant,
+    discord: {
+      token: pick(ha?.discord_token, env.DISCORD_TOKEN),
+      appId: pick(ha?.discord_app_id, env.DISCORD_APP_ID),
+      guildId: pick(ha?.discord_guild_id, env.DISCORD_GUILD_ID),
+    },
+    mistral: {
+      apiKey: pick(ha?.mistral_api_key, env.MISTRAL_API_KEY),
+      chatModel: pick(ha?.mistral_chat_model, env.MISTRAL_CHAT_MODEL, 'mistral-medium-3-5'),
+      transcribeModel: pick(ha?.mistral_transcribe_model, env.MISTRAL_TRANSCRIBE_MODEL, 'voxtral-mini-latest'),
+    },
+    picovoice: {
+      accessKey: pick(ha?.picovoice_access_key, env.PICOVOICE_ACCESS_KEY),
+      keywordPath: pick(ha?.picovoice_keyword_path, env.PICOVOICE_KEYWORD_PATH, '/data/Swann_en_raspberry-pi_v3_0_0.ppn'),
+      sensitivity: clamp(num(ha?.picovoice_sensitivity ?? env.PICOVOICE_SENSITIVITY, 0.6), 0, 1),
+      sileroVadPath: pick(ha?.silero_vad_path, env.SILERO_VAD_PATH, '/data/silero_vad.onnx'),
+    },
+    media: {
+      ytdlpPath: pick(ha?.ytdlp_path, env.YTDLP_PATH, 'yt-dlp'),
+      ytdlpFormat: pick(ha?.ytdlp_format, env.YTDLP_FORMAT, 'bestaudio[ext=webm]/bestaudio/best'),
+      cookiesPath: pick(ha?.ytdlp_cookies_path, env.YTDLP_COOKIES_PATH),
+      searchLimitMax: clamp(num(ha?.search_limit_max ?? env.SEARCH_LIMIT_MAX, 25), 1, 50),
+    },
+    admin: {
+      ingressPort: clamp(num(ha?.ingress_port ?? env.INGRESS_PORT, 8099), 1, 65535),
+      bindAddress: pick(ha?.admin_bind_address, env.ADMIN_BIND_ADDRESS, '0.0.0.0'),
+      ingressOnly: bool(ha?.admin_ingress_only ?? env.ADMIN_INGRESS_ONLY, isHomeAssistant),
+    },
+    behaviour: {
+      logLevel: asLevel(ha?.log_level ?? env.LOG_LEVEL, 'info'),
+      textWakePhrase: pick(ha?.text_wake_phrase, env.TEXT_WAKE_PHRASE, 'Hey Swann'),
+      defaultVolume: clamp(num(ha?.default_volume ?? env.DEFAULT_VOLUME, 80), 0, 100),
+    },
+  };
+
+  // Register every secret with the logger so it can never be printed.
+  registerSecret(config.discord.token);
+  registerSecret(config.mistral.apiKey);
+  registerSecret(config.picovoice.accessKey);
+
+  setLogLevel(config.behaviour.logLevel);
+
+  return config;
+}
+
+/** The resolved, immutable application config. */
+export const config: Config = build();
+
+/**
+ * Presence-only view of credentials for the admin UI / startup checks.
+ * Never exposes any value. File-presence (keyword/silero) and yt-dlp
+ * availability are added by the composition root in index.ts.
+ */
+export function configStatus(): {
+  discordToken: boolean;
+  discordAppId: boolean;
+  mistralApiKey: boolean;
+  picovoiceAccessKey: boolean;
+} {
+  return {
+    discordToken: config.discord.token.length > 0,
+    discordAppId: config.discord.appId.length > 0,
+    mistralApiKey: config.mistral.apiKey.length > 0,
+    picovoiceAccessKey: config.picovoice.accessKey.length > 0,
+  };
+}
+
+/**
+ * Throw early with a clear message if a required credential is missing.
+ * Call from index.ts before booting. Does not log values.
+ */
+export function assertRequired(): void {
+  const missing: string[] = [];
+  if (!config.discord.token) missing.push('DISCORD_TOKEN / discord_token');
+  if (!config.discord.appId) missing.push('DISCORD_APP_ID / discord_app_id');
+  if (!config.mistral.apiKey) missing.push('MISTRAL_API_KEY / mistral_api_key');
+  if (missing.length > 0) {
+    throw new Error(`Missing required configuration: ${missing.join(', ')}`);
+  }
+}
