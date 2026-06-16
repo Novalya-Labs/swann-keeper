@@ -130,6 +130,7 @@ class VoiceListenerImpl implements VoiceListener {
       logger: this.logger.child('pipe'),
       receiver: state.receiver,
       userId,
+      debug: this.voice.kwsDebug,
       onFrame: (frame) => this.handleFrame(state, userId, frame),
       onEnd: () => this.handlePipelineEnd(state, userId),
     });

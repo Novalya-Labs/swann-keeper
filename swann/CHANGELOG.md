@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1
+
+Make voice receive resilient to corrupt Opus packets (the reason no audio
+reached the wake engine).
+
+- The receive pipeline previously piped the whole Opus stream through one
+  streaming decoder; a single corrupt packet ("The compressed data passed is
+  corrupted" — e.g. a DAVE E2EE transition frame) threw and tore down the entire
+  pipeline, so zero frames ever reached the KWS engine. Now each packet is
+  decoded individually and a bad one is skipped, not fatal.
+- With `kws_debug` on, each pipeline logs `Receive pipeline stats {packets,
+  decodeFailures, framesOut}` — so we can see whether audio is actually decoding
+  (framesOut > 0) or every packet is corrupt (decodeFailures == packets).
+
 ## 0.4.0
 
 Add a wake-word diagnostic mode to tune detection.
