@@ -2,16 +2,18 @@
 # =============================================================================
 # Swann — Home Assistant add-on manifest.
 #
-# Runs ONLY the Node bot in a single container, supervised by s6-overlay (do
-# NOT set init:false). Playback is @discordjs/voice + yt-dlp + ffmpeg (no
-# Lavalink, no JVM). Exposes an Ingress-only admin web UI.
+# Runs ONLY the Node bot in a single container, supervised by the base image's
+# s6-overlay v3. Because the image ships its own s6-overlay, `init: false` is
+# REQUIRED so the Supervisor does not insert tini as PID 1 (otherwise s6 fails
+# with "s6-overlay-suexec: fatal: can only run as pid 1"). Playback is
+# @discordjs/voice + yt-dlp + ffmpeg (no Lavalink, no JVM). Ingress-only admin.
 #
 # The option keys below are snake_case and MUST mirror exactly the keys read by
 # src/config.ts (loadHaOptions / HaOptions). The Supervisor writes the resolved
 # values to /data/options.json on every start.
 # =============================================================================
 name: "Swann"
-version: "0.3.0"
+version: "0.3.1"
 slug: "swann"
 description: >-
   Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
@@ -23,8 +25,9 @@ arch:
   - aarch64
   - amd64
 
-# Let s6-overlay (from the base image) supervise the single longrun service.
-# init: false is intentionally NOT set.
+# The base image's s6-overlay v3 must be PID 1, so disable the Supervisor's own
+# init injection. Without this the container dies immediately on start.
+init: false
 
 # --- Ingress web admin UI --------------------------------------------------
 ingress: true

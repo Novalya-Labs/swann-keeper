@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1
+
+Fix the container dying instantly with `s6-overlay-suexec: fatal: can only run
+as pid 1`.
+
+- Set **`init: false`** in the add-on manifest. The base image ships its own
+  s6-overlay v3, which must be PID 1; without this the Supervisor inserts tini
+  as PID 1 and s6 refuses to start. (Only surfaced now that the image finally
+  builds and runs.)
+
 ## 0.3.0
 
 Replace Picovoice/Porcupine with an on-device, open-source wake word.
