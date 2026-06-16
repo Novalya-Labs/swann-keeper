@@ -13,7 +13,7 @@
 # values to /data/options.json on every start.
 # =============================================================================
 name: "Swann"
-version: "0.3.3"
+version: "0.4.0"
 slug: "swann"
 description: >-
   Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
@@ -60,6 +60,7 @@ options:
   kws_keywords_path: "/config/kws/keywords.txt"
   kws_threshold: 0.25
   kws_score: 1.0
+  kws_debug: false
   silero_vad_path: "/config/silero_vad.onnx"
   ytdlp_path: "yt-dlp"
   ytdlp_format: "bestaudio[ext=webm]/bestaudio/best"
@@ -86,6 +87,7 @@ schema:
   kws_keywords_path: "str"
   kws_threshold: "float(0,1)"
   kws_score: "float"
+  kws_debug: "bool"
   silero_vad_path: "str"
   ytdlp_path: "str?"
   ytdlp_format: "str?"

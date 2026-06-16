@@ -46,6 +46,13 @@ export interface VoiceConfig {
   readonly kwsThreshold: number;
   /** Per-keyword score boost (raises recall for a specific keyword). */
   readonly kwsScore: number;
+  /**
+   * Diagnostic mode: when true, the wake engine also runs a parallel ASR
+   * recognizer (same model) and logs frame counts, audio peak level, and the
+   * raw transcript of what it hears — so the keyword can be encoded to match
+   * the real pronunciation. Off in normal operation (extra CPU).
+   */
+  readonly kwsDebug: boolean;
   /** Silero VAD model path (utterance capture after the wake word). */
   readonly sileroVadPath: string;
 }
@@ -100,6 +107,7 @@ interface HaOptions {
   kws_keywords_path?: string;
   kws_threshold?: number;
   kws_score?: number;
+  kws_debug?: boolean;
   silero_vad_path?: string;
   ytdlp_path?: string;
   ytdlp_format?: string;
@@ -177,6 +185,7 @@ function build(): Config {
       kwsKeywordsPath: pick(ha?.kws_keywords_path, env.KWS_KEYWORDS_PATH, '/config/kws/keywords.txt'),
       kwsThreshold: clamp(num(ha?.kws_threshold ?? env.KWS_THRESHOLD, 0.25), 0, 1),
       kwsScore: num(ha?.kws_score ?? env.KWS_SCORE, 1.0),
+      kwsDebug: bool(ha?.kws_debug ?? env.KWS_DEBUG, false),
       sileroVadPath: pick(ha?.silero_vad_path, env.SILERO_VAD_PATH, '/config/silero_vad.onnx'),
     },
     media: {

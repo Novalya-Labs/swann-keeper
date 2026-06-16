@@ -21,7 +21,7 @@
 
 import type { Logger } from '../logger.js';
 import type { VoiceConfig } from '../config.js';
-import { KeywordSpotter, type SherpaOnlineStream } from 'sherpa-onnx-node';
+import { KeywordSpotter, OnlineRecognizer, type SherpaOnlineStream } from 'sherpa-onnx-node';
 
 const SAMPLE_RATE = 16000;
 const FEATURE_DIM = 80;
@@ -109,8 +109,65 @@ export async function createWakeWordEngine(deps: {
     score: voice.kwsScore,
   });
 
+  // --- Optional diagnostic recognizer --------------------------------------
+  // When kwsDebug is on, run a parallel ASR over the same audio so we can see
+  // (a) that frames actually reach the engine, (b) the audio level, and (c) the
+  // raw transcript of what the model hears — to encode the keyword correctly.
+  let recognizer: OnlineRecognizer | null = null;
+  let recStream: SherpaOnlineStream | null = null;
+  let dbgFrames = 0;
+  let dbgPeak = 0;
+  if (voice.kwsDebug) {
+    recognizer = new OnlineRecognizer({
+      featConfig: { sampleRate: SAMPLE_RATE, featureDim: FEATURE_DIM },
+      modelConfig: {
+        transducer: {
+          encoder: voice.kwsEncoderPath,
+          decoder: voice.kwsDecoderPath,
+          joiner: voice.kwsJoinerPath,
+        },
+        tokens: voice.kwsTokensPath,
+        numThreads: 1,
+        provider: 'cpu',
+        debug: false,
+      },
+      enableEndpoint: true,
+      rule1MinTrailingSilence: 1.2,
+      rule2MinTrailingSilence: 0.6,
+      rule3MinUtteranceLength: 20,
+    });
+    recStream = recognizer.createStream();
+    logger.info('KWS DEBUG mode ON — logging audio level + raw transcript', {});
+  }
+
   // Reusable scratch buffer for int16 -> float32 conversion.
   const scratch = new Float32Array(FRAME_SAMPLES);
+
+  function runDiagnostic(samples: Float32Array, n: number): void {
+    if (!recognizer || !recStream) return;
+    try {
+      recStream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
+      while (recognizer.isReady(recStream)) recognizer.decode(recStream);
+      dbgFrames++;
+      for (let i = 0; i < n; i++) {
+        const a = Math.abs(samples[i] ?? 0);
+        if (a > dbgPeak) dbgPeak = a;
+      }
+      // ~1s of audio (31 frames * 512/16000s) -> heartbeat that frames flow.
+      if (dbgFrames % 31 === 0) {
+        logger.info('KWS DEBUG audio', { frames: dbgFrames, peak: dbgPeak.toFixed(3) });
+        dbgPeak = 0;
+      }
+      // On endpoint (end of an utterance) log the raw transcript, then reset.
+      if (recognizer.isEndpoint(recStream)) {
+        const text = recognizer.getResult(recStream).text ?? '';
+        if (text.trim().length > 0) logger.info('KWS DEBUG heard', { transcript: text });
+        recognizer.reset(recStream);
+      }
+    } catch (err) {
+      logger.warn('KWS DEBUG recognizer failed', err);
+    }
+  }
 
   return {
     frameLength: FRAME_SAMPLES,
@@ -122,6 +179,7 @@ export async function createWakeWordEngine(deps: {
         // 32768 keeps the result strictly within [-1, 1).
         samples[i] = (frame[i] ?? 0) / 32768;
       }
+      if (recognizer) runDiagnostic(samples, frame.length);
       try {
         stream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
         while (spotter.isReady(stream)) spotter.decode(stream);
@@ -142,6 +200,8 @@ export async function createWakeWordEngine(deps: {
       // references and let GC reclaim the native handles.
       spotter = null;
       stream = null;
+      recognizer = null;
+      recStream = null;
     },
   };
 }

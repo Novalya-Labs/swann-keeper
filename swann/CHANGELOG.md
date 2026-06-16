@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+Add a wake-word diagnostic mode to tune detection.
+
+- New `kws_debug` option. When enabled, the wake engine runs a parallel ASR
+  over the same audio and logs, at INFO: a periodic audio-level heartbeat
+  (`KWS DEBUG audio {frames, peak}`) and the raw transcript of each utterance
+  (`KWS DEBUG heard {transcript}`). This confirms audio is reaching the engine
+  and shows exactly how the model decodes a given pronunciation, so the
+  `keywords.txt` tokens can be matched to it. Leave it off in normal use.
+
 ## 0.3.3
 
 Fix the admin web UI showing `{"ok":false,"error":"Internal error"}`.

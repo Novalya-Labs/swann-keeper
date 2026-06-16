@@ -96,7 +96,37 @@ declare module 'sherpa-onnx-node' {
     getResult(stream: SherpaOnlineStream): KeywordResult;
   }
 
-  const _default: { Vad: typeof Vad; KeywordSpotter: typeof KeywordSpotter };
+  // --- Online ASR (diagnostic: transcribe what the model hears) -------------
+  interface OnlineRecognizerConfig {
+    featConfig: FeatureConfig;
+    modelConfig: OnlineModelConfig;
+    decodingMethod?: string;
+    enableEndpoint?: boolean | number;
+    rule1MinTrailingSilence?: number;
+    rule2MinTrailingSilence?: number;
+    rule3MinUtteranceLength?: number;
+  }
+
+  interface OnlineRecognizerResult {
+    text: string;
+    tokens?: string[];
+  }
+
+  class OnlineRecognizer {
+    constructor(config: OnlineRecognizerConfig);
+    createStream(): SherpaOnlineStream;
+    isReady(stream: SherpaOnlineStream): boolean;
+    decode(stream: SherpaOnlineStream): void;
+    isEndpoint(stream: SherpaOnlineStream): boolean;
+    reset(stream: SherpaOnlineStream): void;
+    getResult(stream: SherpaOnlineStream): OnlineRecognizerResult;
+  }
+
+  const _default: {
+    Vad: typeof Vad;
+    KeywordSpotter: typeof KeywordSpotter;
+    OnlineRecognizer: typeof OnlineRecognizer;
+  };
   export default _default;
-  export { Vad, KeywordSpotter, SherpaOnlineStream };
+  export { Vad, KeywordSpotter, OnlineRecognizer, SherpaOnlineStream };
 }
