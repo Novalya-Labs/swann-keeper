@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.3
+
+Make voice actually work: drop ffmpeg from the receive path.
+
+- Diagnosis (via `kws_debug`): packets were received and decoded fine
+  (`decodeFailures: 0`) but the ffmpeg 48k->16k resample stage emitted **zero**
+  output (`framesOut: 0`) on the HA Debian image — so no audio ever reached the
+  wake engine. That was the real reason the wake word never fired.
+- The receive pipeline now decodes Opus straight to 16 kHz (libopus resamples
+  internally) and downmixes stereo->mono in JS. No ffmpeg subprocess, no
+  failure mode. (ffmpeg is still in the image for playback/yt-dlp.)
+
 ## 0.4.2
 
 Fix crash `TypeError: OpusEncoder is not a constructor` from 0.4.1.
