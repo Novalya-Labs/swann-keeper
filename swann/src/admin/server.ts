@@ -114,6 +114,28 @@ export function createAdminServer(deps: AdminServerDeps): AdminServer {
       },
     });
 
+    // The skip/stop/pause/resume buttons POST with `Content-Type: application/
+    // json` but NO body; Fastify's default JSON parser rejects an empty body
+    // ("Body cannot be empty"). Treat an empty JSON body as {} so those work.
+    instance.addContentTypeParser(
+      'application/json',
+      { parseAs: 'string' },
+      (_req, body, done) => {
+        const text = typeof body === 'string' ? body : body.toString();
+        if (text.trim().length === 0) {
+          done(null, {});
+          return;
+        }
+        try {
+          done(null, JSON.parse(text));
+        } catch {
+          const err = new Error('Invalid JSON body') as Error & { statusCode?: number };
+          err.statusCode = 400;
+          done(err, undefined);
+        }
+      },
+    );
+
     // Source-IP gate: reject anything not from the HA Ingress gateway when
     // ingressOnly is on. Runs before routing so no handler ever sees it.
     instance.addHook('onRequest', async (req, reply) => {

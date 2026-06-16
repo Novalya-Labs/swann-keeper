@@ -122,7 +122,10 @@ export async function createUtteranceDetector(deps: {
         model: voice.sileroVadPath,
         threshold: 0.5,
         minSpeechDuration: 0.25,
-        minSilenceDuration: 0.5,
+        // Trailing silence that ends an utterance. 0.8s tolerates the natural
+        // inter-word pauses inside a spoken command ("mets ... du ... Jul") so
+        // the capture isn't cut mid-sentence.
+        minSilenceDuration: 0.8,
         windowSize: WINDOW_SIZE,
       },
       sampleRate: SAMPLE_RATE,

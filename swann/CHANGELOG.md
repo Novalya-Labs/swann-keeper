@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.5
+
+Fix spoken-command capture and the admin control buttons.
+
+- **Voice capture grabbed the wake-word tail**: on a wake hit the listener
+  re-fed the triggering frame (the end of "Swann") to the VAD, which then
+  finalized "…ann" as the command as soon as the user paused — so "Swann
+  <pause> play X" transcribed just the wake tail (e.g. "soin"). Capture now
+  starts from the next frame.
+- Bumped the VAD trailing-silence to 0.8s so natural inter-word pauses don't cut
+  a command mid-sentence.
+- **Admin Stop/Skip/Pause/Resume returned 500**: those POSTs send
+  `application/json` with an empty body, which Fastify rejected. An empty JSON
+  body is now parsed as `{}`.
+
 ## 0.4.4
 
 Transcribe spoken commands in French by default.

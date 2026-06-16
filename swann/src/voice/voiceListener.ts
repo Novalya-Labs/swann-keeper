@@ -148,9 +148,11 @@ class VoiceListenerImpl implements VoiceListener {
         state.capturingUserId = userId;
         state.captureSamples = 0;
         state.vad.reset();
-        // Fall through: feed this same frame to the VAD so we don't drop the
-        // leading audio of the command.
-        this.feedCapture(state, userId, frame);
+        // Do NOT feed the triggering frame: it is the TAIL of the wake word
+        // itself. Capturing it lets the VAD finalize "…ann" as the command the
+        // moment the user pauses after the wake word (so "Swann <pause> play X"
+        // captured just the wake tail). Capture starts from the next frame, so
+        // a brief pause after the wake word is fine.
       }
       return;
     }
