@@ -28,7 +28,7 @@
  */
 
 import prism from 'prism-media';
-import * as OpusBinding from '@discordjs/opus';
+import { createRequire } from 'node:module';
 import { EndBehaviorType } from '@discordjs/voice';
 import type { VoiceReceiver } from '@discordjs/voice';
 import type { Logger } from '../logger.js';
@@ -40,12 +40,15 @@ const FRAME_BYTES = FRAME_SAMPLES * 2;
 /** End the per-user opus stream this many ms after the user stops speaking. */
 const SILENCE_END_MS = 1000;
 
-// Minimal structural typing for the @discordjs/opus native decoder we use.
+// @discordjs/opus is a CJS native addon. Load it via createRequire so the
+// constructor resolves reliably under ESM (named/namespace interop put the
+// class under `.default` at runtime -> "OpusEncoder is not a constructor").
+const nodeRequire = createRequire(import.meta.url);
 interface OpusDecoder {
   decode(buf: Buffer): Buffer;
 }
 type OpusCtor = new (rate: number, channels: number) => OpusDecoder;
-const OpusEncoder = (OpusBinding as unknown as { OpusEncoder: OpusCtor }).OpusEncoder;
+const { OpusEncoder } = nodeRequire('@discordjs/opus') as { OpusEncoder: OpusCtor };
 
 export interface UserPipeline {
   /** Stop and clean up all streams for this user. */

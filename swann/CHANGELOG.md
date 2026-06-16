@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2
+
+Fix crash `TypeError: OpusEncoder is not a constructor` from 0.4.1.
+
+- `@discordjs/opus` is a CJS native addon; the ESM namespace import resolved the
+  class under `.default` at runtime. Load it via `createRequire` instead (verified
+  it constructs in a real ESM context).
+
 ## 0.4.1
 
 Make voice receive resilient to corrupt Opus packets (the reason no audio
