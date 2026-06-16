@@ -100,6 +100,18 @@ export function createAdminServer(deps: AdminServerDeps): AdminServer {
       // meaningful, but the source-IP gate below relies on the socket address.
       trustProxy: admin.ingressOnly,
       bodyLimit: 256 * 1024,
+      // HA Ingress can hand us a doubled-slash path (e.g. "//") for the panel
+      // root. That would resolve to the @fastify/static root DIRECTORY, which
+      // the static plugin rejects with 403 -> our error handler turns it into a
+      // 500 "Internal error" page. Collapse repeated slashes in the path (query
+      // untouched) BEFORE routing so "//" maps to our "/" SPA-shell route.
+      rewriteUrl(req) {
+        const url = req.url ?? '/';
+        const q = url.indexOf('?');
+        const path = q === -1 ? url : url.slice(0, q);
+        const query = q === -1 ? '' : url.slice(q);
+        return path.replace(/\/{2,}/g, '/') + query;
+      },
     });
 
     // Source-IP gate: reject anything not from the HA Ingress gateway when

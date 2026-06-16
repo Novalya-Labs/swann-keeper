@@ -1,9 +1,13 @@
 /**
- * Swann — "Hey Swann" text trigger.
+ * Swann — text triggers.
  *
- * Watches guild messages; when a human's message starts with the configured
- * wake phrase (e.g. "Hey Swann"), strips the phrase and routes the remaining
- * free text to the Mistral agent, then relays the agent's reply.
+ * Watches guild messages and routes a human's free text to the Mistral agent
+ * when EITHER:
+ *   - the message starts with the configured wake phrase (e.g. "Hey Swann"), or
+ *   - the message @-mentions the bot directly (e.g. "@Swann comment ça va ?").
+ *
+ * In both cases the trigger (wake phrase / mention) is stripped and the
+ * remaining text is sent to the agent, whose reply is relayed back.
  *
  * Requires the GuildMessages + MessageContent intents (set in client.ts).
  */
@@ -38,6 +42,27 @@ export function matchWakePhrase(content: string, wakePhrase: string): string | n
   return rest;
 }
 
+/**
+ * Returns the utterance after stripping a direct @-mention of the bot if the
+ * message mentions it, otherwise null. All occurrences of the bot mention
+ * (with or without the nickname `!`) are removed, and a leading separator is
+ * trimmed so "@Swann, joue du Jul" yields "joue du Jul".
+ */
+export function matchMention(message: Message): string | null {
+  const botId = message.client.user?.id;
+  if (!botId) return null;
+  // Only react to explicit user mentions of the bot (not @everyone/@here or roles).
+  if (!message.mentions.users.has(botId)) return null;
+
+  const stripped = message.content
+    .replace(new RegExp(`<@!?${botId}>`, 'g'), ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\s*[,:]?\s*/, '')
+    .trim();
+  return stripped;
+}
+
 export function createMessageHandler(
   deps: MessageHandlerDeps,
 ): (message: Message) => Promise<void> {
@@ -48,12 +73,13 @@ export function createMessageHandler(
     if (message.author.bot || message.system) return;
     if (!message.inGuild()) return;
 
-    const utterance = matchWakePhrase(message.content, deps.wakePhrase);
+    // Trigger on either the wake phrase or a direct @-mention of the bot.
+    const utterance = matchWakePhrase(message.content, deps.wakePhrase) ?? matchMention(message);
     if (utterance === null) return;
 
     if (utterance.length === 0) {
       await message.reply({
-        content: 'Yes? Tell me what to play.',
+        content: 'Oui ? Je t\'écoute. / Yes? I\'m listening.',
         allowedMentions: { repliedUser: false },
       });
       return;

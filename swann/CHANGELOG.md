@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.3
+
+Fix the admin web UI showing `{"ok":false,"error":"Internal error"}`.
+
+- HA Ingress can request the panel root with a doubled slash (`//`), which
+  resolved to the `@fastify/static` root **directory** — the static plugin
+  rejects that with 403, which the error handler turned into a 500. The server
+  now collapses repeated slashes in the request path before routing, so `//`
+  maps to the `/` SPA-shell route. (Reproduced and verified.)
+
 ## 0.3.2
 
 Fix a startup crash: `RangeError: Maximum call stack size exceeded`.
