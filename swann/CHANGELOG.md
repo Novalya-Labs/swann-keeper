@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.2
+
+Fix a startup crash: `RangeError: Maximum call stack size exceeded`.
+
+- The admin wiring formed an infinite loop: `index.ts` passed
+  `pushActivity = (e) => recordActivity(e)` **and** then set
+  `recordActivity = admin.recordActivity`, while the admin server's
+  `recordActivity` calls `pushActivity` back — so each activity entry recursed
+  forever. Removed the `pushActivity` argument; all activity now flows once
+  through `admin.recordActivity` into the store.
+
 ## 0.3.1
 
 Fix the container dying instantly with `s6-overlay-suexec: fatal: can only run

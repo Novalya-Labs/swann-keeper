@@ -127,7 +127,10 @@ export async function startBot(): Promise<void> {
         ytdlpAvailable,
       };
     },
-    pushActivity: (entry: ActivityEntry) => recordActivity(entry),
+    // NOTE: do NOT pass `pushActivity` here. The admin server's recordActivity
+    // already writes to its store and would call pushActivity back — and since
+    // we set `recordActivity = admin.recordActivity` below, a pushActivity that
+    // forwards to recordActivity creates infinite recursion (stack overflow).
   });
   // The admin server returns the canonical recorder; route all activity to it.
   recordActivity = admin.recordActivity;
