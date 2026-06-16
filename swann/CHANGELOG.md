@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.4
+
+Transcribe spoken commands in French by default.
+
+- The wake word now fires (audio fix in 0.4.3), but the command after it was
+  transcribed with no language hint, so Voxtral defaulted to English ("Souane"
+  -> "one", poor French). New `voice_language` option (default `fr`, empty =
+  auto-detect) is passed to Voxtral. The agent already replies in the caller's
+  language.
+
 ## 0.4.3
 
 Make voice actually work: drop ffmpeg from the receive path.

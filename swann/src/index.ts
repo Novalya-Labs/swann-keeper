@@ -108,6 +108,7 @@ export async function startBot(): Promise<void> {
     logger,
     voice: config.voice,
     transcriber,
+    ...(config.voice.language ? { language: config.voice.language } : {}),
   });
 
   // --- admin (Ingress web UI) ----------------------------------------------

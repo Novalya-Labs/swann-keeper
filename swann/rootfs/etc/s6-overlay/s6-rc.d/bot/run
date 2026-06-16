@@ -33,6 +33,7 @@ export KWS_KEYWORDS_PATH="$(bashio::config 'kws_keywords_path')"
 export KWS_THRESHOLD="$(bashio::config 'kws_threshold')"
 export KWS_SCORE="$(bashio::config 'kws_score')"
 export KWS_DEBUG="$(bashio::config 'kws_debug')"
+export VOICE_LANGUAGE="$(bashio::config 'voice_language')"
 export SILERO_VAD_PATH="$(bashio::config 'silero_vad_path')"
 
 # --- Media (yt-dlp / ffmpeg) -----------------------------------------------
