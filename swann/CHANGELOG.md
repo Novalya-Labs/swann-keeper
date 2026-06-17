@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2
+
+### Changed
+- Wake matching now scans the **first few words** of the transcript (not just
+  the first), so a stray leading word Voxtral prepends ("alors", "eh", …)
+  doesn't defeat the match.
+- The welcome message is sent **after** the voice listener attaches (so it can
+  never block voice) and now **warns in the log** when the bot lacks the
+  "Send Messages" permission in the voice channel — the reason a welcome /
+  confirmation message would silently not appear.
+
 ## 0.6.1
 
 ### Added

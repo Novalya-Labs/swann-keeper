@@ -179,20 +179,37 @@ export async function startBot(): Promise<void> {
 
     const connection = await joinVoice(channel, logger);
     joined.set(guildId, channel.id);
-    
-    // Send welcome message once per channel
-    const welcomeKey = `${guildId}-${channel.id}`;
-    if (!welcomeSent.has(welcomeKey) && channel.isSendable()) {
-      await channel.send({
-        content: "Bonjour je suis Swann, votre assistant IA, vous pouvez me déclencher en prononçant mon nom suivi de votre souhait. Par exemple Swann, met du Jul. vous pouvez également dire Swann arrete la musique"
-      });
-      welcomeSent.add(welcomeKey);
-    }
-    
+
     audio.bindConnection(guildId, connection);
     if (voice.isListening(guildId)) voice.detach(guildId);
     voice.attach(guildId, connection);
     log.info('Joined voice (shared play + receive)', { guildId, channelId: channel.id });
+
+    // Welcome message once per channel — AFTER attach so it can never block the
+    // voice listener, and guarded so a missing Send-Messages permission only
+    // warns (the voice channel's text chat needs that permission).
+    const channelId = channel.id;
+    const welcomeKey = `${guildId}-${channelId}`;
+    if (!welcomeSent.has(welcomeKey)) {
+      welcomeSent.add(welcomeKey);
+      const sendable = channel.isSendable();
+      if (!sendable) {
+        log.warn('Welcome/confirmation messages disabled: the bot lacks "Send Messages" in this voice channel', {
+          guildId,
+          channelId,
+        });
+      } else {
+        try {
+          await channel.send({
+            content:
+              'Bonjour, je suis Swann, votre assistant IA. Déclenchez-moi en prononçant mon nom suivi de votre demande — par exemple « Swann, mets du Jul » ou « Swann, arrête la musique ».',
+            allowedMentions: { parse: [] },
+          });
+        } catch (err) {
+          log.warn('Welcome message failed to send', { guildId, err });
+        }
+      }
+    }
     recordActivity({
       at: Date.now(),
       kind: 'system',

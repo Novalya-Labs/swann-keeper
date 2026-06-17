@@ -307,8 +307,9 @@ class VoiceListenerImpl implements VoiceListener {
 
   /**
    * Return the command after the wake word if the transcript opens with one,
-   * else null. Accents/case-insensitive; tolerates a leading filler ("hey",
-   * "ok", "dis", …) before the wake word.
+   * else null. Accents/case-insensitive. Scans the first few tokens (not just
+   * the first) so a leading filler or a stray word Voxtral prepends ("hey",
+   * "eh", "alors", …) doesn't defeat the match.
    */
   private stripWake(transcript: string): string | null {
     const tokens = transcript
@@ -319,13 +320,12 @@ class VoiceListenerImpl implements VoiceListener {
       .filter(Boolean);
     if (tokens.length === 0) return null;
 
-    const fillers = new Set(['hey', 'ok', 'okay', 'dis', 'eh', 'et', 'ah', 'oh']);
-    let i = 0;
-    if (tokens.length > 1 && tokens[0] !== undefined && fillers.has(tokens[0])) i = 1;
-
-    const w = tokens[i];
-    if (w !== undefined && this.voice.wakeWords.includes(w)) {
-      return tokens.slice(i + 1).join(' ').trim();
+    const scan = Math.min(3, tokens.length);
+    for (let i = 0; i < scan; i++) {
+      const w = tokens[i];
+      if (w !== undefined && this.voice.wakeWords.includes(w)) {
+        return tokens.slice(i + 1).join(' ').trim();
+      }
     }
     return null;
   }
