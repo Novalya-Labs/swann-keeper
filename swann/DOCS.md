@@ -72,6 +72,18 @@ Optionally, a Netscape-format `cookies.txt` for yt-dlp (to bypass age/region
 gates or YouTube rate-limits): place it at `/config/cookies.txt` and point
 `ytdlp_cookies_path` at it.
 
+For **spoken replies (TTS)** — optional, off by default — install a French
+Piper voice into `/config/tts/`:
+
+1. Download `vits-piper-fr_FR-siwis-medium.tar.bz2` from the sherpa-onnx TTS
+   releases (<https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models>).
+2. Extract it into `/config/tts/` so you have:
+   - `/config/tts/fr_FR-siwis-medium.onnx`
+   - `/config/tts/tokens.txt`
+   - `/config/tts/espeak-ng-data/` (directory)
+3. Set `tts_enabled: true` and restart. Swann then speaks its answers aloud
+   (pausing/resuming the music). If the files are missing it just stays silent.
+
 ## Configuration
 
 All options map 1:1 to the bot's internal config. Secrets are stored only in the

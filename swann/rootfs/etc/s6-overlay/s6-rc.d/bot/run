@@ -23,6 +23,9 @@ export DISCORD_GUILD_ID="$(bashio::config 'discord_guild_id' '')"
 # --- Mistral ---------------------------------------------------------------
 export MISTRAL_CHAT_MODEL="$(bashio::config 'mistral_chat_model')"
 export MISTRAL_TRANSCRIBE_MODEL="$(bashio::config 'mistral_transcribe_model')"
+export MISTRAL_CHAT_PROMPT_COST_PER_1M="$(bashio::config 'mistral_chat_prompt_cost_per_1m')"
+export MISTRAL_CHAT_COMPLETION_COST_PER_1M="$(bashio::config 'mistral_chat_completion_cost_per_1m')"
+export MISTRAL_TRANSCRIBE_COST_PER_MINUTE="$(bashio::config 'mistral_transcribe_cost_per_minute')"
 
 # --- Wake word (sherpa-onnx KWS) / VAD -------------------------------------
 export KWS_ENCODER_PATH="$(bashio::config 'kws_encoder_path')"
@@ -37,6 +40,13 @@ export WAKE_MODE="$(bashio::config 'wake_mode')"
 export VOICE_WAKE_WORDS="$(bashio::config 'voice_wake_words')"
 export VOICE_LANGUAGE="$(bashio::config 'voice_language')"
 export SILERO_VAD_PATH="$(bashio::config 'silero_vad_path')"
+
+# --- TTS (offline sherpa-onnx, optional, disabled by default) ---------------
+export TTS_ENABLED="$(bashio::config 'tts_enabled')"
+export TTS_MODEL_PATH="$(bashio::config 'tts_model_path')"
+export TTS_TOKENS_PATH="$(bashio::config 'tts_tokens_path')"
+export TTS_DATA_DIR="$(bashio::config 'tts_data_dir')"
+export TTS_RATE="$(bashio::config 'tts_rate')"
 
 # --- Media (yt-dlp / ffmpeg) -----------------------------------------------
 export YTDLP_PATH="$(bashio::config 'ytdlp_path' '')"

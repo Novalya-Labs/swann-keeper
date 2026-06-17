@@ -36,6 +36,12 @@ export interface AdminServerDeps {
   readonly admin: AdminConfig;
   readonly audio: AudioService;
   readonly configStatus: () => ConfigStatus;
+  /** Pricing for the admin usage cost estimate (USD). */
+  readonly costRates: {
+    readonly chatPromptPer1M: number;
+    readonly chatCompletionPer1M: number;
+    readonly transcribePerMinute: number;
+  };
   /**
    * Optional sink the rest of the app can call to push activity entries. The
    * returned server also exposes `recordActivity`; this dep lets index.ts share
@@ -75,13 +81,17 @@ export interface AdminServer {
   stop(): Promise<void>;
   /** Append an activity entry to the live feed (for discord/voice modules). */
   recordActivity(e: ActivityEntry): void;
+  /** Usage recorders for the cost counter. */
+  recordTokenUsage(u: { promptTokens: number; completionTokens: number }): void;
+  recordAudioSeconds(seconds: number): void;
+  recordAgentRun(): void;
 }
 
 export function createAdminServer(deps: AdminServerDeps): AdminServer {
-  const { logger: rootLogger, admin, audio, configStatus, pushActivity } = deps;
+  const { logger: rootLogger, admin, audio, configStatus, costRates, pushActivity } = deps;
   const logger = rootLogger.child('admin');
 
-  const store: AdminStateStore = createAdminStateStore({ logger, audio, configStatus });
+  const store: AdminStateStore = createAdminStateStore({ logger, audio, configStatus, costRates });
   const publicDir = resolvePublicDir(logger);
 
   let app: FastifyInstance | null = null;
@@ -189,5 +199,12 @@ export function createAdminServer(deps: AdminServerDeps): AdminServer {
     }
   }
 
-  return { start, stop, recordActivity };
+  return {
+    start,
+    stop,
+    recordActivity,
+    recordTokenUsage: store.recordTokenUsage,
+    recordAudioSeconds: store.recordAudioSeconds,
+    recordAgentRun: store.recordAgentRun,
+  };
 }

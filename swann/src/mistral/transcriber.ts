@@ -94,7 +94,9 @@ export function createTranscriber(deps: CreateTranscriberDeps): Transcriber {
       file = await openAsBlob(input.filePath);
     } else if (input.pcm16kMono) {
       const wav = pcmToWav(input.pcm16kMono);
-      file = new Blob([new Uint8Array(wav.buffer, wav.byteOffset, wav.byteLength)], { type: 'audio/wav' });
+      // Copy into a fresh ArrayBuffer-backed Uint8Array (a Node Buffer is backed
+      // by ArrayBufferLike, which is not assignable to BlobPart under newer libs).
+      file = new Blob([new Uint8Array(wav)], { type: 'audio/wav' });
     } else {
       throw new Error('TranscriptionInput requires either filePath or pcm16kMono');
     }

@@ -122,11 +122,52 @@ declare module 'sherpa-onnx-node' {
     getResult(stream: SherpaOnlineStream): OnlineRecognizerResult;
   }
 
+  // --- Offline TTS (text-to-speech voice replies) --------------------------
+  interface OfflineTtsVitsModelConfig {
+    model: string;
+    tokens?: string;
+    dataDir?: string;
+    lexicon?: string;
+    noiseScale?: number;
+    noiseScaleW?: number;
+    lengthScale?: number;
+  }
+
+  interface OfflineTtsModelConfig {
+    vits: OfflineTtsVitsModelConfig;
+    numThreads?: number;
+    provider?: string;
+    debug?: boolean;
+  }
+
+  interface OfflineTtsConfig {
+    model: OfflineTtsModelConfig;
+  }
+
+  interface TtsRequest {
+    text: string;
+    sid?: number;
+    speed?: number;
+  }
+
+  interface GeneratedAudio {
+    samples: Float32Array;
+    sampleRate: number;
+  }
+
+  class OfflineTts {
+    constructor(config: OfflineTtsConfig);
+    generate(req: TtsRequest): GeneratedAudio;
+    readonly numSpeakers: number;
+    readonly sampleRate: number;
+  }
+
   const _default: {
     Vad: typeof Vad;
     KeywordSpotter: typeof KeywordSpotter;
     OnlineRecognizer: typeof OnlineRecognizer;
+    OfflineTts: typeof OfflineTts;
   };
   export default _default;
-  export { Vad, KeywordSpotter, OnlineRecognizer, SherpaOnlineStream };
+  export { Vad, KeywordSpotter, OnlineRecognizer, OfflineTts, SherpaOnlineStream };
 }

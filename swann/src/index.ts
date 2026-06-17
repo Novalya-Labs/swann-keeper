@@ -23,6 +23,7 @@ import type { ActivityEntry, AgentContext, AudioService, VoiceCommandEvent } fro
 import { createAudioService } from './audio/index.js';
 import { createMistralAgent, createTranscriber } from './mistral/index.js';
 import { createVoiceListener } from './voice/index.js';
+import { createTtsService } from './tts/index.js';
 import { createAdminServer } from './admin/index.js';
 
 import { createClient, joinVoice } from './discord/client.js';
@@ -111,6 +112,10 @@ export async function startBot(): Promise<void> {
     ...(config.voice.language ? { language: config.voice.language } : {}),
   });
 
+  // Optional spoken replies (offline TTS); silent no-op if disabled or model
+  // files absent.
+  const tts = createTtsService({ logger, voice: config.voice });
+
   // --- admin (Ingress web UI) ----------------------------------------------
   const admin = createAdminServer({
     logger,
@@ -127,6 +132,11 @@ export async function startBot(): Promise<void> {
         sileroModel: existsSync(config.voice.sileroVadPath),
         ytdlpAvailable,
       };
+    },
+    costRates: {
+      chatPromptPer1M: config.mistral.chatPromptCostPer1M,
+      chatCompletionPer1M: config.mistral.chatCompletionCostPer1M,
+      transcribePerMinute: config.mistral.transcribeCostPerMinute,
     },
     // NOTE: do NOT pass `pushActivity` here. The admin server's recordActivity
     // already writes to its store and would call pushActivity back — and since
@@ -213,6 +223,9 @@ export async function startBot(): Promise<void> {
     };
     log.info('Voice command', { user: userName, transcript: event.transcript });
     const reply = await agent.run(event.transcript, agentCtx);
+    admin.recordAgentRun();
+    if (reply.usage) admin.recordTokenUsage(reply.usage);
+    if (event.audioBilledSec !== undefined) admin.recordAudioSeconds(event.audioBilledSec);
     recordActivity({
       at: Date.now(),
       kind: 'voice',
@@ -236,6 +249,16 @@ export async function startBot(): Promise<void> {
     } catch (err) {
       log.debug('Could not post voice confirmation to the channel', { err });
     }
+
+    // Speak the reply aloud (optional; no-op if TTS disabled / model absent).
+    if (tts.isAvailable() && reply.text?.trim()) {
+      try {
+        const clip = await tts.synthesize(reply.text.trim());
+        if (clip) await audio.speak(event.guildId, clip, 'pcm');
+      } catch (err) {
+        log.debug('TTS reply failed', { err });
+      }
+    }
   }
 
   // --- discord event handlers ----------------------------------------------
@@ -245,6 +268,10 @@ export async function startBot(): Promise<void> {
     agent,
     wakePhrase: config.behaviour.textWakePhrase,
     recordActivity,
+    onAgentReply: (reply) => {
+      admin.recordAgentRun();
+      if (reply.usage) admin.recordTokenUsage(reply.usage);
+    },
   });
 
   client.on(Events.InteractionCreate, (interaction: Interaction) => {

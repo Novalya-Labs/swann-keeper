@@ -32,6 +32,10 @@ export interface MistralConfig {
   readonly apiKey: string;
   readonly chatModel: string;
   readonly transcribeModel: string;
+  /** Pricing used only for the admin UI's rough cost estimate (USD). */
+  readonly chatPromptCostPer1M: number;
+  readonly chatCompletionCostPer1M: number;
+  readonly transcribeCostPerMinute: number;
 }
 
 export interface VoiceConfig {
@@ -72,6 +76,14 @@ export interface VoiceConfig {
   readonly language: string;
   /** Silero VAD model path (utterance capture after the wake word). */
   readonly sileroVadPath: string;
+  /** Speak agent replies aloud (offline sherpa-onnx TTS). Off by default. */
+  readonly ttsEnabled: boolean;
+  /** Piper VITS model + tokens + espeak-ng data dir for French TTS. */
+  readonly ttsModelPath: string;
+  readonly ttsTokensPath: string;
+  readonly ttsDataDir: string;
+  /** TTS speaking speed (1.0 = normal). */
+  readonly ttsRate: number;
 }
 
 export interface MediaConfig {
@@ -117,6 +129,9 @@ interface HaOptions {
   mistral_api_key?: string;
   mistral_chat_model?: string;
   mistral_transcribe_model?: string;
+  mistral_chat_prompt_cost_per_1m?: number;
+  mistral_chat_completion_cost_per_1m?: number;
+  mistral_transcribe_cost_per_minute?: number;
   kws_encoder_path?: string;
   kws_decoder_path?: string;
   kws_joiner_path?: string;
@@ -129,6 +144,11 @@ interface HaOptions {
   voice_wake_words?: string;
   voice_language?: string;
   silero_vad_path?: string;
+  tts_enabled?: boolean;
+  tts_model_path?: string;
+  tts_tokens_path?: string;
+  tts_data_dir?: string;
+  tts_rate?: number;
   ytdlp_path?: string;
   ytdlp_format?: string;
   ytdlp_cookies_path?: string;
@@ -196,6 +216,9 @@ function build(): Config {
       apiKey: pick(ha?.mistral_api_key, env.MISTRAL_API_KEY),
       chatModel: pick(ha?.mistral_chat_model, env.MISTRAL_CHAT_MODEL, 'mistral-medium-3-5'),
       transcribeModel: pick(ha?.mistral_transcribe_model, env.MISTRAL_TRANSCRIBE_MODEL, 'voxtral-mini-latest'),
+      chatPromptCostPer1M: num(ha?.mistral_chat_prompt_cost_per_1m ?? env.MISTRAL_CHAT_PROMPT_COST_PER_1M, 0.4),
+      chatCompletionCostPer1M: num(ha?.mistral_chat_completion_cost_per_1m ?? env.MISTRAL_CHAT_COMPLETION_COST_PER_1M, 2.0),
+      transcribeCostPerMinute: num(ha?.mistral_transcribe_cost_per_minute ?? env.MISTRAL_TRANSCRIBE_COST_PER_MINUTE, 0.001),
     },
     voice: {
       kwsEncoderPath: pick(ha?.kws_encoder_path, env.KWS_ENCODER_PATH, '/config/kws/encoder.onnx'),
@@ -213,6 +236,11 @@ function build(): Config {
         .filter(Boolean),
       language: pick(ha?.voice_language, env.VOICE_LANGUAGE, 'fr'),
       sileroVadPath: pick(ha?.silero_vad_path, env.SILERO_VAD_PATH, '/config/silero_vad.onnx'),
+      ttsEnabled: bool(ha?.tts_enabled ?? env.TTS_ENABLED, false),
+      ttsModelPath: pick(ha?.tts_model_path, env.TTS_MODEL_PATH, '/config/tts/fr_FR-siwis-medium.onnx'),
+      ttsTokensPath: pick(ha?.tts_tokens_path, env.TTS_TOKENS_PATH, '/config/tts/tokens.txt'),
+      ttsDataDir: pick(ha?.tts_data_dir, env.TTS_DATA_DIR, '/config/tts/espeak-ng-data'),
+      ttsRate: clamp(num(ha?.tts_rate ?? env.TTS_RATE, 1.0), 0.5, 2.0),
     },
     media: {
       ytdlpPath: pick(ha?.ytdlp_path, env.YTDLP_PATH, 'yt-dlp'),

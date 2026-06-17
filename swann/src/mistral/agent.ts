@@ -90,8 +90,29 @@ interface SdkMessage {
 interface SdkChoice {
   message?: SdkMessage;
 }
+interface SdkUsage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
 interface SdkCompletion {
   choices?: SdkChoice[];
+  usage?: SdkUsage;
+}
+
+/** Read prompt/completion tokens defensively (camelCase or snake_case). */
+function readUsage(c: SdkCompletion): { prompt: number; completion: number } {
+  const u = c.usage;
+  if (!u) return { prompt: 0, completion: 0 };
+  const prompt = u.promptTokens ?? u.prompt_tokens ?? 0;
+  const completion = u.completionTokens ?? u.completion_tokens ?? 0;
+  return {
+    prompt: Number.isFinite(prompt) ? prompt : 0,
+    completion: Number.isFinite(completion) ? completion : 0,
+  };
 }
 
 /** A message we feed back into the conversation. Loosely typed for the SDK. */
@@ -157,6 +178,13 @@ export function createMistralAgent(deps: CreateMistralAgentDeps): MistralAgent {
       { role: 'user', content: text },
     ];
     const toolsUsed: ToolName[] = [];
+    let promptTokens = 0;
+    let completionTokens = 0;
+    const usage = (): AgentReply['usage'] => ({
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    });
 
     log.debug('Agent run start', { guildId: ctx.guildId, userId: ctx.userId, utterance: text });
 
@@ -168,6 +196,9 @@ export function createMistralAgent(deps: CreateMistralAgentDeps): MistralAgent {
           tools: TOOL_SPECS as never,
           toolChoice: 'auto',
         })) as SdkCompletion;
+        const u1 = readUsage(completion);
+        promptTokens += u1.prompt;
+        completionTokens += u1.completion;
 
         const message = completion.choices?.[0]?.message;
         const toolCalls = message?.toolCalls ?? [];
@@ -181,7 +212,7 @@ export function createMistralAgent(deps: CreateMistralAgentDeps): MistralAgent {
         if (toolCalls.length === 0) {
           const reply = messageText(message).trim();
           log.debug('Agent run done', { turn, toolsUsed });
-          return { text: truncate(reply, MAX_REPLY_CHARS), toolsUsed, ok: true };
+          return { text: truncate(reply, MAX_REPLY_CHARS), toolsUsed, ok: true, usage: usage() };
         }
 
         // Push the assistant turn verbatim so tool results line up by id.
@@ -209,11 +240,15 @@ export function createMistralAgent(deps: CreateMistralAgentDeps): MistralAgent {
         messages: messages as never,
         toolChoice: 'none',
       })) as SdkCompletion;
+      const u2 = readUsage(finalCompletion);
+      promptTokens += u2.prompt;
+      completionTokens += u2.completion;
       const finalText = messageText(finalCompletion.choices?.[0]?.message).trim();
       return {
         text: truncate(finalText || 'Done.', MAX_REPLY_CHARS),
         toolsUsed,
         ok: true,
+        usage: usage(),
       };
     } catch (err) {
       log.error('Agent run failed', err);

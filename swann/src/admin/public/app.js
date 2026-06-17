@@ -16,6 +16,7 @@
     players: document.getElementById('players'),
     credentials: document.getElementById('credentials'),
     activity: document.getElementById('activity'),
+    usage: document.getElementById('usage'),
   };
 
   function esc(s) {
@@ -187,6 +188,24 @@
       .join('');
   }
 
+  function renderUsage(u) {
+    if (!u) {
+      els.usage.innerHTML = '<li class="muted">No data</li>';
+      return;
+    }
+    var rows = [
+      ['Commands', String(u.agentCommands)],
+      ['Audio transcribed', (u.transcriptionAudioSeconds || 0).toFixed(1) + 's'],
+      ['Chat tokens', u.chatTokensTotal + ' (' + u.chatTokensPrompt + ' in / ' + u.chatTokensCompletion + ' out)'],
+      ['Est. cost', '$' + (u.estimatedCostUsd || 0).toFixed(4)],
+    ];
+    els.usage.innerHTML = rows
+      .map(function (r) {
+        return '<li>' + esc(r[0]) + '<span class="cred-state">' + esc(r[1]) + '</span></li>';
+      })
+      .join('');
+  }
+
   function setConn(ok) {
     els.conn.textContent = ok ? 'live' : 'offline';
     els.conn.className = 'pill ' + (ok ? 'pill-ok' : 'pill-err');
@@ -204,6 +223,7 @@
         renderPlayers(state.players);
         renderCredentials(state.config);
         renderActivity(state.activity);
+        renderUsage(state.usage);
       })
       .catch(function () {
         setConn(false);

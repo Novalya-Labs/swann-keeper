@@ -13,7 +13,7 @@
  */
 
 import type { Message } from 'discord.js';
-import type { ActivityEntry, MistralAgent } from '../types.js';
+import type { ActivityEntry, AgentReply, MistralAgent } from '../types.js';
 import type { Logger } from '../logger.js';
 import { buildAgentContext, buildCommandContextFromMessage } from './context.js';
 
@@ -22,6 +22,8 @@ export interface MessageHandlerDeps {
   readonly agent: MistralAgent;
   readonly wakePhrase: string;
   readonly recordActivity: (entry: ActivityEntry) => void;
+  /** Optional usage hook called once per agent run (for the cost counter). */
+  readonly onAgentReply?: (reply: AgentReply) => void;
 }
 
 /**
@@ -91,6 +93,7 @@ export function createMessageHandler(
     try {
       if (message.channel.isSendable()) await message.channel.sendTyping();
       const reply = await deps.agent.run(utterance, agentCtx);
+      deps.onAgentReply?.(reply);
       await ctx.reply(reply.text || (reply.ok ? 'Done.' : 'Sorry, I could not do that.'));
       deps.recordActivity({
         at: Date.now(),

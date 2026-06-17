@@ -17,7 +17,7 @@
 
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
-import type { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import {
   AudioPlayerStatus,
   NoSubscriberBehavior,
@@ -252,6 +252,79 @@ class AudioServiceImpl implements AudioService {
     if (!state) return;
     state.loop = mode;
     this.emitQueueUpdate(guildId);
+  }
+
+  /**
+   * Play a one-shot TTS clip on the shared player, then resume the music.
+   *
+   * The player holds one resource at a time, so we swap to the TTS resource and
+   * — once it finishes — re-play the saved music resource (its yt-dlp/ffmpeg
+   * stream keeps running while detached, so it continues roughly where it left
+   * off). `transitioning` is held true for the whole clip so the persistent
+   * Idle handler does NOT advance the queue when the clip ends.
+   */
+  public async speak(
+    guildId: string,
+    audioData: Buffer,
+    streamType: 'pcm' | 'opus' = 'pcm',
+  ): Promise<void> {
+    const state = this.guilds.get(guildId);
+    if (!state || !state.connection) {
+      this.log.warn('speak(): no voice connection for guild', { guildId });
+      return;
+    }
+
+    const savedResource = state.resource;
+    const wasPlaying =
+      state.player.state.status === AudioPlayerStatus.Playing ||
+      state.player.state.status === AudioPlayerStatus.Buffering;
+
+    let ttsResource: AudioResource;
+    try {
+      ttsResource = createAudioResource(Readable.from([audioData]), {
+        inputType: streamType === 'opus' ? StreamType.Opus : StreamType.Raw,
+        inlineVolume: true,
+      });
+      ttsResource.volume?.setVolume(state.volume / 100);
+    } catch (err) {
+      this.log.warn('speak(): failed to build TTS resource', { guildId, err });
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        state.player.off('stateChange', onChange);
+        // Resume the music exactly where it was, if it was playing.
+        if (wasPlaying && savedResource && !savedResource.ended) {
+          try {
+            state.player.play(savedResource);
+          } catch (err) {
+            this.log.debug('speak(): resume failed', { guildId, err });
+          }
+        }
+        state.transitioning = false;
+        resolve();
+      };
+      const onChange = (_old: AudioPlayerState, next: AudioPlayerState): void => {
+        if (next.status === AudioPlayerStatus.Idle) finish();
+      };
+      const timer = setTimeout(finish, 60_000);
+
+      // Hold transitioning across the clip so onTrackIdle() doesn't advance the
+      // queue when the TTS resource hits Idle.
+      state.transitioning = true;
+      state.player.on('stateChange', onChange);
+      try {
+        state.player.play(ttsResource);
+      } catch (err) {
+        this.log.warn('speak(): play failed', { guildId, err });
+        finish();
+      }
+    });
   }
 
   public async remove(guildId: string, index: number): Promise<QueueItem | null> {

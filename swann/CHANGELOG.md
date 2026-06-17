@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+- **Voice replies (TTS):** Swann can now speak its answers aloud in French using
+  an offline sherpa-onnx Piper voice, played through the shared voice connection
+  (the music is paused and resumed around the reply — the queue is preserved).
+  Disabled by default. Enable with `tts_enabled: true` after installing the
+  `vits-piper-fr_FR-siwis-medium` model into `/config/tts/`
+  (`fr_FR-siwis-medium.onnx`, `tokens.txt`, `espeak-ng-data/`). If the files are
+  absent the bot just stays silent — no error, same as the wake-word files. New
+  options: `tts_enabled`, `tts_model_path`, `tts_tokens_path`, `tts_data_dir`,
+  `tts_rate`. (TTS audio is resampled to 48 kHz in JS — no ffmpeg subprocess.)
+- **Usage & cost panel** in the admin UI: tracks, for the current session,
+  Voxtral transcription seconds, agent command count, and Mistral chat tokens,
+  with a rough cost estimate. Counts both voice and text ("Hey Swann") commands.
+  Cost rates are configurable: `mistral_chat_prompt_cost_per_1m`,
+  `mistral_chat_completion_cost_per_1m`, `mistral_transcribe_cost_per_minute`.
+  Counters reset on restart. The authoritative billing view stays the Mistral
+  console.
+
 ## 0.5.1
 
 - Voice commands now post a confirmation in the voice channel's built-in text

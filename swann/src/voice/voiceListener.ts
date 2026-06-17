@@ -245,6 +245,7 @@ class VoiceListenerImpl implements VoiceListener {
         voiceChannelId: state.voiceChannelId,
         transcript,
         durationSec,
+        ...(result.audioSeconds !== undefined ? { audioBilledSec: result.audioSeconds } : {}),
       });
     } catch (err) {
       this.logger.error('Transcription failed', { guildId: state.guildId, error: (err as Error).message });
@@ -266,6 +267,7 @@ class VoiceListenerImpl implements VoiceListener {
     if (durationSec < 0.4) return; // ignore sub-word blips
 
     let transcript: string;
+    let audioBilledSec: number | undefined;
     try {
       const pcm = float32ToPcm16le(samples);
       const result = await this.transcriber.transcribe({
@@ -273,6 +275,7 @@ class VoiceListenerImpl implements VoiceListener {
         ...(this.language ? { language: this.language } : {}),
       });
       transcript = result.text.trim();
+      audioBilledSec = result.audioSeconds;
     } catch (err) {
       this.logger.error('Transcription failed', { guildId: state.guildId, error: (err as Error).message });
       this.events.emit('error', err as Error);
@@ -298,6 +301,7 @@ class VoiceListenerImpl implements VoiceListener {
       voiceChannelId: state.voiceChannelId,
       transcript: command,
       durationSec,
+      ...(audioBilledSec !== undefined ? { audioBilledSec } : {}),
     });
   }
 

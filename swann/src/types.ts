@@ -145,6 +145,15 @@ export interface AudioService {
   /** Clear the pending queue but keep the current track playing. */
   clear(guildId: string): Promise<void>;
 
+  /**
+   * Speak a one-shot TTS clip through the guild's shared player: pauses the
+   * current track (by swapping the player resource), plays the clip to
+   * completion, then resumes the music. `audioData` is 48 kHz stereo s16le when
+   * `streamType` is 'pcm' (the default). No-op if the guild has no connection.
+   * The queue, history and playback continue intact.
+   */
+  speak(guildId: string, audioData: Buffer, streamType?: 'pcm' | 'opus'): Promise<void>;
+
   /** Leave the voice channel and destroy the player. */
   disconnect(guildId: string): Promise<void>;
 
@@ -280,6 +289,8 @@ export interface AgentReply {
   readonly toolsUsed: ToolName[];
   /** True if the loop terminated cleanly; false if it errored/aborted. */
   readonly ok: boolean;
+  /** Token usage summed across the run's turns, if the SDK reported it. */
+  readonly usage?: { readonly promptTokens: number; readonly completionTokens: number; readonly totalTokens: number };
 }
 
 /**
@@ -339,6 +350,8 @@ export interface VoiceCommandEvent {
   readonly transcript: string;
   /** Captured utterance length in seconds. */
   readonly durationSec: number;
+  /** Voxtral-billed audio seconds for this utterance, if reported. */
+  readonly audioBilledSec?: number;
 }
 
 /** Lower-level voice pipeline events for diagnostics / admin status. */
@@ -421,6 +434,21 @@ export interface ConfigStatus {
   readonly ytdlpAvailable: boolean;
 }
 
+/** Session usage / rough cost, accumulated in-memory since the last restart. */
+export interface UsageMetrics {
+  /** Total Voxtral-billed transcription seconds. */
+  readonly transcriptionAudioSeconds: number;
+  /** Number of agent runs (voice + text commands). */
+  readonly agentCommands: number;
+  readonly chatTokensPrompt: number;
+  readonly chatTokensCompletion: number;
+  readonly chatTokensTotal: number;
+  /** Rough cost estimate in USD from the configured rates. */
+  readonly estimatedCostUsd: number;
+  /** When this counter started (epoch ms). */
+  readonly sessionStartAt: number;
+}
+
 /** Aggregate live state the admin server serves to its frontend. */
 export interface AdminState {
   readonly config: ConfigStatus;
@@ -428,6 +456,8 @@ export interface AdminState {
   /** Recently executed agent/voice actions, newest first. */
   readonly activity: ActivityEntry[];
   readonly uptimeSec: number;
+  /** Session usage + rough cost (always present; zeros at boot). */
+  readonly usage: UsageMetrics;
 }
 
 export interface ActivityEntry {
