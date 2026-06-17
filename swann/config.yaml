@@ -13,7 +13,7 @@
 # values to /data/options.json on every start.
 # =============================================================================
 name: "Swann"
-version: "0.6.0"
+version: "0.6.1"
 slug: "swann"
 description: >-
   Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
@@ -73,6 +73,8 @@ options:
   tts_tokens_path: "/config/tts/tokens.txt"
   tts_data_dir: "/config/tts/espeak-ng-data"
   tts_rate: 1.0
+  wake_chime: false
+  wake_chime_path: ""
   ytdlp_path: "yt-dlp"
   ytdlp_format: "bestaudio[ext=webm]/bestaudio/best"
   ytdlp_cookies_path: ""
@@ -111,6 +113,8 @@ schema:
   tts_tokens_path: "str?"
   tts_data_dir: "str?"
   tts_rate: "float(0.5,2.0)?"
+  wake_chime: "bool"
+  wake_chime_path: "str?"
   ytdlp_path: "str?"
   ytdlp_format: "str?"
   ytdlp_cookies_path: "str?"

@@ -47,6 +47,8 @@ export TTS_MODEL_PATH="$(bashio::config 'tts_model_path')"
 export TTS_TOKENS_PATH="$(bashio::config 'tts_tokens_path')"
 export TTS_DATA_DIR="$(bashio::config 'tts_data_dir')"
 export TTS_RATE="$(bashio::config 'tts_rate')"
+export WAKE_CHIME="$(bashio::config 'wake_chime')"
+export WAKE_CHIME_PATH="$(bashio::config 'wake_chime_path')"
 
 # --- Media (yt-dlp / ffmpeg) -----------------------------------------------
 export YTDLP_PATH="$(bashio::config 'ytdlp_path' '')"

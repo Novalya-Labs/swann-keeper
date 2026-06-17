@@ -21,6 +21,7 @@ import { logger } from './logger.js';
 import type { ActivityEntry, AgentContext, AudioService, VoiceCommandEvent } from './types.js';
 
 import { createAudioService } from './audio/index.js';
+import { loadWakeSound } from './audio/wakeSound.js';
 import { createMistralAgent, createTranscriber } from './mistral/index.js';
 import { createVoiceListener } from './voice/index.js';
 import { createTtsService } from './tts/index.js';
@@ -116,6 +117,12 @@ export async function startBot(): Promise<void> {
   // files absent.
   const tts = createTtsService({ logger, voice: config.voice });
 
+  // Optional wake-acknowledged chime, built once at boot (null when disabled).
+  const wakeSound = config.voice.wakeChime ? loadWakeSound({ logger, voice: config.voice }) : null;
+
+  /** Tools whose effect IS audible playback — speaking over them is pointless. */
+  const PLAYBACK_TOOLS = new Set(['play_song', 'play_playlist', 'skip', 'resume']);
+
   // --- admin (Ingress web UI) ----------------------------------------------
   const admin = createAdminServer({
     logger,
@@ -153,6 +160,8 @@ export async function startBot(): Promise<void> {
   // --- single shared voice connection per guild ----------------------------
   // joined: guildId -> channelId the bot is currently connected to.
   const joined = new Map<string, string>();
+  // welcomeSent: track channels where the welcome message has been sent (guildId-channelId)
+  const welcomeSent = new Set<string>();
 
   /**
    * Join a voice channel once (selfDeaf:false) and share the connection with
@@ -170,6 +179,16 @@ export async function startBot(): Promise<void> {
 
     const connection = await joinVoice(channel, logger);
     joined.set(guildId, channel.id);
+    
+    // Send welcome message once per channel
+    const welcomeKey = `${guildId}-${channel.id}`;
+    if (!welcomeSent.has(welcomeKey) && channel.isSendable()) {
+      await channel.send({
+        content: "Bonjour je suis Swann, votre assistant IA, vous pouvez me déclencher en prononçant mon nom suivi de votre souhait. Par exemple Swann, met du Jul. vous pouvez également dire Swann arrete la musique"
+      });
+      welcomeSent.add(welcomeKey);
+    }
+    
     audio.bindConnection(guildId, connection);
     if (voice.isListening(guildId)) voice.detach(guildId);
     voice.attach(guildId, connection);
@@ -185,6 +204,7 @@ export async function startBot(): Promise<void> {
   /** Leave voice for a guild: detach the listener and destroy the connection. */
   async function leaveVoice(guildId: string): Promise<void> {
     if (!joined.has(guildId)) return;
+    const channelId = joined.get(guildId);
     try {
       voice.detach(guildId);
       await audio.disconnect(guildId);
@@ -192,6 +212,10 @@ export async function startBot(): Promise<void> {
       log.warn('leaveVoice failed', { guildId, err });
     }
     joined.delete(guildId);
+    // Clean up welcome message tracking for this channel
+    if (channelId) {
+      welcomeSent.delete(`${guildId}-${channelId}`);
+    }
     log.info('Left voice', { guildId });
   }
 
@@ -222,6 +246,16 @@ export async function startBot(): Promise<void> {
       userName,
     };
     log.info('Voice command', { user: userName, transcript: event.transcript });
+
+    // Acknowledge the wake word with a short chime before the agent round-trip.
+    if (wakeSound) {
+      try {
+        await audio.speak(event.guildId, wakeSound, 'pcm');
+      } catch (err) {
+        log.debug('Wake chime failed', { err });
+      }
+    }
+
     const reply = await agent.run(event.transcript, agentCtx);
     admin.recordAgentRun();
     if (reply.usage) admin.recordTokenUsage(reply.usage);
@@ -250,8 +284,11 @@ export async function startBot(): Promise<void> {
       log.debug('Could not post voice confirmation to the channel', { err });
     }
 
-    // Speak the reply aloud (optional; no-op if TTS disabled / model absent).
-    if (tts.isAvailable() && reply.text?.trim()) {
+    // Speak the reply aloud — but NOT when the command started music: the music
+    // is the feedback, and ducking it to say "now playing X" is clunky + races
+    // the just-started track on the shared player. Speak for stops/errors/info.
+    const startedPlayback = reply.toolsUsed.some((t) => PLAYBACK_TOOLS.has(t));
+    if (tts.isAvailable() && reply.text?.trim() && !startedPlayback) {
       try {
         const clip = await tts.synthesize(reply.text.trim());
         if (clip) await audio.speak(event.guildId, clip, 'pcm');

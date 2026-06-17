@@ -82,6 +82,21 @@ function clampInt16(f: number): number {
   return Math.round(s < 0 ? s * 0x8000 : s * 0x7fff);
 }
 
+/**
+ * Strip markdown + emoji so the voice doesn't literally say "asterisk asterisk"
+ * etc. Keeps the spoken text natural.
+ */
+function stripForSpeech(text: string): string {
+  return text
+    .replace(/!?\[([^\]]+)\]\([^)]*\)/g, '$1') // [label](url) / ![alt](url) -> label
+    .replace(/[*_`~#>|]/g, '') // bold/italic/code/strike/heading/quote markers
+    // emoji + symbols/arrows/geometric/dingbats + variation selectors. The
+    // 2190-2BFF block is all symbol-ish (normal punctuation lives below 2190).
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2190}-\u{2BFF}\u{FE0F}\u{200D}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function createTtsService(deps: { logger: Logger; voice: VoiceConfig }): TtsService {
   const { voice } = deps;
   const log = deps.logger.child('tts');
@@ -133,7 +148,7 @@ export function createTtsService(deps: { logger: Logger; voice: VoiceConfig }): 
     },
     async synthesize(text: string): Promise<Buffer | null> {
       if (!available) return null;
-      const clean = text.trim();
+      const clean = stripForSpeech(text);
       if (!clean) return null;
       try {
         const tts = await engine();

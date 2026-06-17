@@ -84,6 +84,10 @@ export interface VoiceConfig {
   readonly ttsDataDir: string;
   /** TTS speaking speed (1.0 = normal). */
   readonly ttsRate: number;
+  /** Play a short chime when a voice command's wake word is matched. */
+  readonly wakeChime: boolean;
+  /** Optional custom 16-bit PCM WAV for the chime (empty = built-in tone). */
+  readonly wakeChimePath: string;
 }
 
 export interface MediaConfig {
@@ -149,6 +153,8 @@ interface HaOptions {
   tts_tokens_path?: string;
   tts_data_dir?: string;
   tts_rate?: number;
+  wake_chime?: boolean;
+  wake_chime_path?: string;
   ytdlp_path?: string;
   ytdlp_format?: string;
   ytdlp_cookies_path?: string;
@@ -241,6 +247,8 @@ function build(): Config {
       ttsTokensPath: pick(ha?.tts_tokens_path, env.TTS_TOKENS_PATH, '/config/tts/tokens.txt'),
       ttsDataDir: pick(ha?.tts_data_dir, env.TTS_DATA_DIR, '/config/tts/espeak-ng-data'),
       ttsRate: clamp(num(ha?.tts_rate ?? env.TTS_RATE, 1.0), 0.5, 2.0),
+      wakeChime: bool(ha?.wake_chime ?? env.WAKE_CHIME, false),
+      wakeChimePath: pick(ha?.wake_chime_path, env.WAKE_CHIME_PATH, ''),
     },
     media: {
       ytdlpPath: pick(ha?.ytdlp_path, env.YTDLP_PATH, 'yt-dlp'),

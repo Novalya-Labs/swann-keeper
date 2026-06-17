@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.1
+
+### Added
+- **Wake chime:** play a short sound when a voice command's wake word is
+  matched, before the agent runs. Enable with `wake_chime: true` — no file
+  needed, a tone is generated in code. Optionally point `wake_chime_path` at a
+  custom **16-bit PCM WAV** (resampled in JS; MP3 isn't supported — convert to
+  WAV).
+
+### Fixed
+- **TTS read markdown/emoji aloud** ("asterisk asterisk", "▶"): the reply text
+  is now stripped of markdown and emoji before synthesis (accents and normal
+  punctuation are kept).
+- **TTS fought the music** on "play" commands — Swann would duck/interrupt the
+  track it had just started (and could race it on the shared player). Swann now
+  only speaks the reply when the command did **not** start playback (stops,
+  errors, info, queue questions…); for "play X" the music itself is the
+  feedback. The text-chat confirmation is still posted for every command.
+
 ## 0.6.0
 
 ### Added
