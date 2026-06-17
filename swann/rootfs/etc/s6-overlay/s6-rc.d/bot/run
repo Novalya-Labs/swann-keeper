@@ -65,6 +65,8 @@ export ADMIN_INGRESS_ONLY="$(bashio::config 'admin_ingress_only')"
 export LOG_LEVEL="$(bashio::config 'log_level')"
 export TEXT_WAKE_PHRASE="$(bashio::config 'text_wake_phrase')"
 export DEFAULT_VOLUME="$(bashio::config 'default_volume')"
+export WELCOME_MESSAGE="$(bashio::config 'welcome_message')"
+export WELCOME_VOICE="$(bashio::config 'welcome_voice')"
 
 cd /opt/app || bashio::exit.nok "Cannot enter /opt/app"
 

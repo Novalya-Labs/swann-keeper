@@ -162,6 +162,9 @@ export async function startBot(): Promise<void> {
   const joined = new Map<string, string>();
   // welcomeSent: track channels where the welcome message has been sent (guildId-channelId)
   const welcomeSent = new Set<string>();
+  // Spoken welcome is synthesized ONCE (fixed text) and replayed — no repeated
+  // TTS/Voxtral cost on each join.
+  let welcomeClip: Buffer | null = null;
 
   /**
    * Join a voice channel once (selfDeaf:false) and share the connection with
@@ -190,23 +193,31 @@ export async function startBot(): Promise<void> {
     // warns (the voice channel's text chat needs that permission).
     const channelId = channel.id;
     const welcomeKey = `${guildId}-${channelId}`;
-    if (!welcomeSent.has(welcomeKey)) {
+    const welcomeMessage = config.behaviour.welcomeMessage.trim();
+    if (welcomeMessage && !welcomeSent.has(welcomeKey)) {
       welcomeSent.add(welcomeKey);
-      const sendable = channel.isSendable();
-      if (!sendable) {
+
+      // Text welcome in the voice channel chat (needs Send Messages perm).
+      if (channel.isSendable()) {
+        try {
+          await channel.send({ content: welcomeMessage, allowedMentions: { parse: [] } });
+        } catch (err) {
+          log.warn('Welcome message failed to send', { guildId, err });
+        }
+      } else {
         log.warn('Welcome/confirmation messages disabled: the bot lacks "Send Messages" in this voice channel', {
           guildId,
           channelId,
         });
-      } else {
+      }
+
+      // Spoken welcome (local TTS, free) — synthesized once, then replayed.
+      if (config.behaviour.welcomeVoice && tts.isAvailable()) {
         try {
-          await channel.send({
-            content:
-              'Bonjour, je suis Swann, votre assistant IA. Déclenchez-moi en prononçant mon nom suivi de votre demande — par exemple « Swann, mets du Jul » ou « Swann, arrête la musique ».',
-            allowedMentions: { parse: [] },
-          });
+          if (!welcomeClip) welcomeClip = await tts.synthesize(welcomeMessage);
+          if (welcomeClip) await audio.speak(guildId, welcomeClip, 'pcm');
         } catch (err) {
-          log.warn('Welcome message failed to send', { guildId, err });
+          log.debug('Spoken welcome failed', { guildId, err });
         }
       }
     }

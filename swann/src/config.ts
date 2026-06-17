@@ -112,6 +112,10 @@ export interface BehaviourConfig {
   readonly logLevel: LogLevel;
   readonly textWakePhrase: string;
   readonly defaultVolume: number;
+  /** Greeting posted in the voice channel chat on join (empty = none). */
+  readonly welcomeMessage: string;
+  /** Also speak the welcome aloud via local TTS (synthesized once, cached). */
+  readonly welcomeVoice: boolean;
 }
 
 export interface Config {
@@ -165,6 +169,8 @@ interface HaOptions {
   log_level?: string;
   text_wake_phrase?: string;
   default_volume?: number;
+  welcome_message?: string;
+  welcome_voice?: boolean;
 }
 
 function loadHaOptions(): HaOptions | null {
@@ -265,6 +271,12 @@ function build(): Config {
       logLevel: asLevel(ha?.log_level ?? env.LOG_LEVEL, 'info'),
       textWakePhrase: pick(ha?.text_wake_phrase, env.TEXT_WAKE_PHRASE, 'Hey Swann'),
       defaultVolume: clamp(num(ha?.default_volume ?? env.DEFAULT_VOLUME, 80), 0, 100),
+      welcomeMessage: pick(
+        ha?.welcome_message,
+        env.WELCOME_MESSAGE,
+        'Bonjour, je suis Swann, votre assistant IA. Déclenchez-moi en prononçant mon nom suivi de votre demande — par exemple « Swann, mets du Jul » ou « Swann, arrête la musique ».',
+      ),
+      welcomeVoice: bool(ha?.welcome_voice ?? env.WELCOME_VOICE, false),
     },
   };
 

@@ -13,7 +13,7 @@
 # values to /data/options.json on every start.
 # =============================================================================
 name: "Swann"
-version: "0.6.2"
+version: "0.6.3"
 slug: "swann"
 description: >-
   Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
@@ -85,6 +85,8 @@ options:
   log_level: "info"
   text_wake_phrase: "Hey Swann"
   default_volume: 80
+  welcome_message: "Bonjour, je suis Swann, votre assistant IA. Déclenchez-moi en prononçant mon nom suivi de votre demande — par exemple « Swann, mets du Jul » ou « Swann, arrête la musique »."
+  welcome_voice: false
 
 schema:
   discord_token: "password"
@@ -125,3 +127,5 @@ schema:
   log_level: "list(trace|debug|info|warning|error)"
   text_wake_phrase: "str"
   default_volume: "int(0,100)"
+  welcome_message: "str?"
+  welcome_voice: "bool"

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.3
+
+### Added
+- **Spoken welcome:** the join greeting can now also be **spoken aloud** via the
+  local TTS voice. Enable with `welcome_voice: true` (needs TTS set up). It uses
+  the on-device TTS — **no Voxtral / no API cost** — and the fixed text is
+  synthesized **once and cached**, so repeated joins replay the same audio with
+  zero extra cost.
+- The welcome text is now configurable via `welcome_message` (empty = no
+  welcome) instead of being hard-coded.
+
 ## 0.6.2
 
 ### Changed
