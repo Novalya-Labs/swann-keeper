@@ -219,6 +219,23 @@ export async function startBot(): Promise<void> {
       guildId: event.guildId,
       message: `${userName}: "${event.transcript}" -> ${reply.toolsUsed.join(', ') || 'no tools'}`,
     });
+
+    // Acknowledge in the voice channel's built-in text chat so the speaker sees
+    // what Swann understood and did (voice commands otherwise have no feedback).
+    try {
+      const channel =
+        client.channels.cache.get(event.voiceChannelId) ??
+        (await client.channels.fetch(event.voiceChannelId));
+      if (channel?.isSendable()) {
+        const body = reply.text?.trim() || (reply.ok ? '✅ Fait.' : "❌ Je n'ai pas pu faire ça.");
+        await channel.send({
+          content: `🎙️ **${userName}** : « ${event.transcript} »\n${body}`,
+          allowedMentions: { parse: [] },
+        });
+      }
+    } catch (err) {
+      log.debug('Could not post voice confirmation to the channel', { err });
+    }
   }
 
   // --- discord event handlers ----------------------------------------------

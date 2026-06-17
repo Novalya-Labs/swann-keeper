@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Voice commands now post a confirmation in the voice channel's built-in text
+  chat ("🎙️ **User**: « … » → reply"), so the speaker sees what Swann
+  understood and did.
+
 ## 0.5.0
 
 Voxtral-based wake detection (reliable for French) — default voice mode.
