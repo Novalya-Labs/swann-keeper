@@ -45,7 +45,8 @@ interface GuildState {
   readonly guildId: string;
   readonly voiceChannelId: string;
   readonly receiver: VoiceReceiver;
-  readonly wake: WakeWordEngine;
+  /** null in 'transcribe' wake mode (no on-device keyword spotter). */
+  readonly wake: WakeWordEngine | null;
   readonly vad: UtteranceDetector;
   /** Active per-user receive pipelines, keyed by Discord user id. */
   readonly pipelines: Map<string, UserPipeline>;
@@ -92,10 +93,13 @@ class VoiceListenerImpl implements VoiceListener {
   }
 
   private async initGuild(guildId: string, voiceChannelId: string, receiver: VoiceReceiver): Promise<void> {
-    const [wake, vad] = await Promise.all([
-      createWakeWordEngine({ logger: this.logger.child('wake'), voice: this.voice }),
-      createUtteranceDetector({ logger: this.logger.child('vad'), voice: this.voice }),
-    ]);
+    const vad = await createUtteranceDetector({ logger: this.logger.child('vad'), voice: this.voice });
+    // Only the 'kws' mode needs the on-device keyword spotter; 'transcribe'
+    // mode wakes purely from the Voxtral transcript.
+    const wake =
+      this.voice.wakeMode === 'kws'
+        ? await createWakeWordEngine({ logger: this.logger.child('wake'), voice: this.voice })
+        : null;
 
     const state: GuildState = {
       guildId,
@@ -117,7 +121,7 @@ class VoiceListenerImpl implements VoiceListener {
     receiver.speaking.on('start', onSpeakingStart);
 
     this.guilds.set(guildId, state);
-    this.logger.info('Voice listening started', { guildId, voiceChannelId });
+    this.logger.info('Voice listening started', { guildId, voiceChannelId, wakeMode: this.voice.wakeMode });
   }
 
   private handleSpeakingStart(state: GuildState, userId: string): void {
@@ -140,6 +144,16 @@ class VoiceListenerImpl implements VoiceListener {
   private handleFrame(state: GuildState, userId: string, frame: Int16Array): void {
     if (state.detached) return;
 
+    // Transcribe mode: no keyword gate — feed every frame to the VAD and let
+    // Voxtral decide (the wake word is matched on the transcript). One VAD per
+    // guild; on a small server one person speaks at a time.
+    if (this.voice.wakeMode === 'transcribe') {
+      const completed = state.vad.feed(frame);
+      if (completed) void this.handleTranscribedUtterance(state, userId, completed);
+      return;
+    }
+
+    if (!state.wake) return;
     if (state.capturingUserId === null) {
       // Listening for the wake word.
       if (state.wake.detect(frame)) {
@@ -181,6 +195,11 @@ class VoiceListenerImpl implements VoiceListener {
 
   private handlePipelineEnd(state: GuildState, userId: string): void {
     state.pipelines.delete(userId);
+    if (this.voice.wakeMode === 'transcribe') {
+      const flushed = state.vad.finish();
+      if (flushed) void this.handleTranscribedUtterance(state, userId, flushed);
+      return;
+    }
     // If the capturing user's stream ended mid-utterance, flush the VAD to get
     // whatever was captured.
     if (state.capturingUserId === userId) {
@@ -233,6 +252,80 @@ class VoiceListenerImpl implements VoiceListener {
     }
   }
 
+  /**
+   * Transcribe mode: transcribe a completed utterance with Voxtral, and if it
+   * starts with a wake word, emit the rest as a command. Multilingual and far
+   * more reliable than the English KWS for non-English wake words.
+   */
+  private async handleTranscribedUtterance(
+    state: GuildState,
+    userId: string,
+    samples: Float32Array,
+  ): Promise<void> {
+    const durationSec = samples.length / VAD_SAMPLE_RATE;
+    if (durationSec < 0.4) return; // ignore sub-word blips
+
+    let transcript: string;
+    try {
+      const pcm = float32ToPcm16le(samples);
+      const result = await this.transcriber.transcribe({
+        pcm16kMono: pcm,
+        ...(this.language ? { language: this.language } : {}),
+      });
+      transcript = result.text.trim();
+    } catch (err) {
+      this.logger.error('Transcription failed', { guildId: state.guildId, error: (err as Error).message });
+      this.events.emit('error', err as Error);
+      return;
+    }
+    if (!transcript) return;
+
+    const command = this.stripWake(transcript);
+    if (command === null) {
+      this.logger.debug('No wake word in utterance; ignoring', { guildId: state.guildId, transcript });
+      return;
+    }
+    if (command.length === 0) {
+      this.logger.debug('Wake word with no command; ignoring', { guildId: state.guildId, transcript });
+      return;
+    }
+
+    this.logger.info('Voice wake matched', { guildId: state.guildId, userId, transcript, command });
+    this.events.emit('command', {
+      guildId: state.guildId,
+      userId,
+      userName: userId, // the discord module resolves the display name
+      voiceChannelId: state.voiceChannelId,
+      transcript: command,
+      durationSec,
+    });
+  }
+
+  /**
+   * Return the command after the wake word if the transcript opens with one,
+   * else null. Accents/case-insensitive; tolerates a leading filler ("hey",
+   * "ok", "dis", …) before the wake word.
+   */
+  private stripWake(transcript: string): string | null {
+    const tokens = transcript
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '') // strip combining accents
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    if (tokens.length === 0) return null;
+
+    const fillers = new Set(['hey', 'ok', 'okay', 'dis', 'eh', 'et', 'ah', 'oh']);
+    let i = 0;
+    if (tokens.length > 1 && tokens[0] !== undefined && fillers.has(tokens[0])) i = 1;
+
+    const w = tokens[i];
+    if (w !== undefined && this.voice.wakeWords.includes(w)) {
+      return tokens.slice(i + 1).join(' ').trim();
+    }
+    return null;
+  }
+
   detach(guildId: string): void {
     const state = this.guilds.get(guildId);
     if (!state) return;
@@ -249,7 +342,7 @@ class VoiceListenerImpl implements VoiceListener {
       pipeline.stop();
     }
     state.pipelines.clear();
-    state.wake.release();
+    state.wake?.release();
     state.vad.release();
     this.guilds.delete(guildId);
     this.logger.info('Voice listening stopped', { guildId });

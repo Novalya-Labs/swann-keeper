@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+Voxtral-based wake detection (reliable for French) — default voice mode.
+
+- The on-device sherpa KWS model is English-only and decoded a French
+  pronunciation ("Souane") differently every time, so no fixed keyword could
+  match reliably. New default `wake_mode: transcribe`: the VAD captures each
+  utterance, Voxtral transcribes it (multilingual), and the command fires when
+  the transcript starts with a wake word — accents/case-insensitive, tolerating
+  a leading "hey/ok/dis".
+- New options: `wake_mode` (`transcribe` | `kws`), `voice_wake_words`
+  (comma-separated, default `swann,souane,swan,soane,soin`). KWS mode and its
+  `kws_*` model options remain available.
+- Trade-off: transcribe mode sends one Voxtral transcription per utterance in
+  the channel. Remove `soin` from `voice_wake_words` if it false-triggers.
+
 ## 0.4.5
 
 Fix spoken-command capture and the admin control buttons.

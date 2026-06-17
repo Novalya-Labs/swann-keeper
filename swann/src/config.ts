@@ -54,6 +54,17 @@ export interface VoiceConfig {
    */
   readonly kwsDebug: boolean;
   /**
+   * Voice wake detection strategy:
+   *   'transcribe' — Voxtral transcribes every utterance (multilingual, reliable
+   *      for French); fires when the transcript starts with a wake word. Costs
+   *      one transcription per utterance.
+   *   'kws' — on-device sherpa KeywordSpotter (English model, low latency, free)
+   *      but unreliable for non-English pronunciations.
+   */
+  readonly wakeMode: 'transcribe' | 'kws';
+  /** transcribe mode: accepted spoken wake words (normalized lowercase). */
+  readonly wakeWords: string[];
+  /**
    * Transcription language hint (ISO-639-1, e.g. "fr") passed to Voxtral for the
    * command spoken after the wake word. Empty = let Voxtral auto-detect. A hint
    * markedly improves accuracy for non-English speech.
@@ -114,6 +125,8 @@ interface HaOptions {
   kws_threshold?: number;
   kws_score?: number;
   kws_debug?: boolean;
+  wake_mode?: string;
+  voice_wake_words?: string;
   voice_language?: string;
   silero_vad_path?: string;
   ytdlp_path?: string;
@@ -193,6 +206,11 @@ function build(): Config {
       kwsThreshold: clamp(num(ha?.kws_threshold ?? env.KWS_THRESHOLD, 0.25), 0, 1),
       kwsScore: num(ha?.kws_score ?? env.KWS_SCORE, 1.0),
       kwsDebug: bool(ha?.kws_debug ?? env.KWS_DEBUG, false),
+      wakeMode: pick(ha?.wake_mode, env.WAKE_MODE, 'transcribe') === 'kws' ? 'kws' : 'transcribe',
+      wakeWords: pick(ha?.voice_wake_words, env.VOICE_WAKE_WORDS, 'swann,souane,swan,soane,soin')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
       language: pick(ha?.voice_language, env.VOICE_LANGUAGE, 'fr'),
       sileroVadPath: pick(ha?.silero_vad_path, env.SILERO_VAD_PATH, '/config/silero_vad.onnx'),
     },
