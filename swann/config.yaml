@@ -13,7 +13,7 @@
 # values to /data/options.json on every start.
 # =============================================================================
 name: "Swann"
-version: "0.6.3"
+version: "0.6.4"
 slug: "swann"
 description: >-
   Discord music bot with @discordjs/voice + yt-dlp playback, natural-language
@@ -79,6 +79,7 @@ options:
   ytdlp_format: "bestaudio[ext=webm]/bestaudio/best"
   ytdlp_cookies_path: ""
   search_limit_max: 25
+  ytdlp_timeout_ms: 25000
   ingress_port: 8099
   admin_bind_address: "0.0.0.0"
   admin_ingress_only: true
@@ -121,6 +122,7 @@ schema:
   ytdlp_format: "str?"
   ytdlp_cookies_path: "str?"
   search_limit_max: "int(1,50)?"
+  ytdlp_timeout_ms: "int(3000,120000)?"
   ingress_port: "port"
   admin_bind_address: "str"
   admin_ingress_only: "bool"

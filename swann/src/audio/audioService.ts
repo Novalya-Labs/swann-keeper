@@ -393,7 +393,9 @@ class AudioServiceImpl implements AudioService {
 
   /** Build the base argv shared by every yt-dlp invocation. */
   private baseArgs(): string[] {
-    const args = ['--no-warnings'];
+    // `--socket-timeout` bounds each network read so a stalled connection can't
+    // hang yt-dlp indefinitely (the wall-clock kill in runYtdlp is the backstop).
+    const args = ['--no-warnings', '--socket-timeout', '15'];
     if (this.media.cookiesPath && this.media.cookiesPath.length > 0) {
       args.push('--cookies', this.media.cookiesPath);
     }
@@ -407,6 +409,14 @@ class AudioServiceImpl implements AudioService {
   private async resolveQuery(query: string, source?: SearchSource): Promise<SearchResult> {
     const trimmed = query.trim();
     if (trimmed.length === 0) return { kind: 'empty', tracks: [] };
+
+    // Reject local filesystem paths. These never come from a real request; they
+    // are Voxtral hallucinations on non-speech audio (e.g. a macOS screenshot
+    // temp path) that would otherwise be fed to `ytsearch` and play junk.
+    if (looksLikeLocalPath(trimmed)) {
+      this.log.warn('Rejecting local-path-like query', { query: trimmed.slice(0, 120) });
+      return { kind: 'empty', tracks: [] };
+    }
 
     const isUrl = /^https?:\/\//i.test(trimmed);
     const args = ['-J', ...this.baseArgs()];
@@ -436,20 +446,45 @@ class AudioServiceImpl implements AudioService {
     return mapYtdlpResult(doc, isSearch);
   }
 
-  /** Run yt-dlp and collect stdout. Rejects on non-zero exit or spawn error. */
+  /**
+   * Run yt-dlp and collect stdout. Rejects on non-zero exit or spawn error.
+   * A wall-clock timeout SIGKILLs a hung child and rejects, so a stalled
+   * metadata fetch can never leave `play()` (and the voice pipeline) pending.
+   */
   private runYtdlp(args: string[]): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const child = spawn(this.media.ytdlpPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
       let out = '';
       let err = '';
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          /* already gone */
+        }
+        reject(new Error(`yt-dlp timed out after ${this.media.ytdlpTimeoutMs}ms`));
+      }, this.media.ytdlpTimeoutMs);
+
       child.stdout.on('data', (chunk: Buffer) => {
         out += chunk.toString('utf8');
       });
       child.stderr.on('data', (chunk: Buffer) => {
         err += chunk.toString('utf8');
       });
-      child.on('error', (e) => reject(e));
+      child.on('error', (e) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(e);
+      });
       child.on('close', (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         if (code === 0) resolve(out);
         else reject(new Error(`yt-dlp exited with code ${code}: ${err.trim().slice(0, 400)}`));
       });
@@ -598,10 +633,48 @@ class AudioServiceImpl implements AudioService {
       this.log.debug('yt-dlp stderr', { guildId: state.guildId, line: chunk.toString('utf8').trim() });
     });
 
-    const probe = await demuxProbe(child.stdout);
+    // Bound the probe: if yt-dlp spawns but never produces a decodable byte,
+    // demuxProbe would await forever and wedge startNext(). Race it against a
+    // timeout that kills the child so the caller's catch advances the queue.
+    const probe = await this.probeWithTimeout(child, state.guildId);
     return createAudioResource(probe.stream, {
       inputType: probe.type === StreamType.Arbitrary ? StreamType.Arbitrary : probe.type,
       inlineVolume: true,
+    });
+  }
+
+  /** demuxProbe the child's stdout, rejecting (and SIGKILLing) past the cap. */
+  private probeWithTimeout(
+    child: StreamingChild,
+    guildId: string,
+  ): Promise<Awaited<ReturnType<typeof demuxProbe>>> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.log.warn('yt-dlp stream probe timed out; killing child', { guildId });
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          /* already gone */
+        }
+        reject(new Error(`yt-dlp stream produced no decodable audio within ${this.media.ytdlpTimeoutMs}ms`));
+      }, this.media.ytdlpTimeoutMs);
+      demuxProbe(child.stdout).then(
+        (probe) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(probe);
+        },
+        (err: unknown) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(err instanceof Error ? err : new Error(String(err)));
+        },
+      );
     });
   }
 
@@ -671,6 +744,21 @@ class AudioServiceImpl implements AudioService {
 /** Clamp + truncate a volume into the 0..100 integer range. */
 function clampVolume(volume: number): number {
   return Math.min(100, Math.max(0, Math.trunc(volume)));
+}
+
+/**
+ * Heuristic: does this query look like a local filesystem path rather than
+ * something to search/stream? These come from Voxtral hallucinations on
+ * non-speech audio (notably macOS screenshot temp paths) and must never reach
+ * yt-dlp. Matches absolute POSIX/Windows paths and bare media/file filenames.
+ */
+function looksLikeLocalPath(query: string): boolean {
+  const q = query.trim();
+  if (/^(?:\/|~\/|[a-z]:\\)/i.test(q)) return true; // /var/folders…, ~/…, C:\…
+  if (/(?:var\/folders|temporaryitems|screencaptureui|\/users\/|\/tmp\/)/i.test(q)) return true;
+  // A bare filename ending in a non-audio file extension (e.g. "Screenshot.png").
+  if (/\.(?:png|jpe?g|gif|webp|heic|pdf|txt|docx?|mov|zip)$/i.test(q)) return true;
+  return false;
 }
 
 /** Re-export so callers don't need to import the helper from trackMapper. */

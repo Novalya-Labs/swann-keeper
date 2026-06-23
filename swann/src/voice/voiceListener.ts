@@ -238,6 +238,10 @@ class VoiceListenerImpl implements VoiceListener {
         this.logger.debug('Empty transcript; ignoring utterance', { guildId: state.guildId, userId });
         return;
       }
+      if (looksLikeHallucination(transcript)) {
+        this.logger.debug('Discarding hallucinated transcript', { guildId: state.guildId, transcript });
+        return;
+      }
       this.events.emit('command', {
         guildId: state.guildId,
         userId,
@@ -290,6 +294,14 @@ class VoiceListenerImpl implements VoiceListener {
     }
     if (command.length === 0) {
       this.logger.debug('Wake word with no command; ignoring', { guildId: state.guildId, transcript });
+      return;
+    }
+    if (looksLikeHallucination(command)) {
+      this.logger.debug('Wake matched but command looks hallucinated; ignoring', {
+        guildId: state.guildId,
+        transcript,
+        command,
+      });
       return;
     }
 
@@ -355,6 +367,20 @@ class VoiceListenerImpl implements VoiceListener {
   isListening(guildId: string): boolean {
     return this.guilds.has(guildId);
   }
+}
+
+/**
+ * Whisper/Voxtral emit boilerplate on silence or non-speech (music bleed, noise).
+ * The worst case here is a local filesystem path (e.g. a macOS screenshot temp
+ * path) that, treated as a command, gets fed to yt-dlp. Reject anything that
+ * looks like a path/file artifact so it never reaches the agent.
+ */
+function looksLikeHallucination(text: string): boolean {
+  const t = text.trim();
+  if (/(?:var\/folders|temporaryitems|screencaptureui)/i.test(t)) return true;
+  if (/(?:^|\s)(?:\/|~\/|[a-z]:\\)/i.test(t)) return true; // contains an absolute path
+  if (/\.(?:png|jpe?g|gif|webp|heic|pdf|txt|docx?|mov|zip)(?:\s|$)/i.test(t)) return true;
+  return false;
 }
 
 /** Convert 16k mono Float32 [-1,1] to signed 16-bit LE PCM Buffer. */

@@ -99,6 +99,12 @@ export interface MediaConfig {
   readonly cookiesPath: string;
   /** Max number of results a single search/playlist request may resolve. */
   readonly searchLimitMax: number;
+  /**
+   * Hard wall-clock cap (ms) on any single yt-dlp invocation. A hung yt-dlp
+   * (weird query, network stall) would otherwise leave `play()` — and the whole
+   * voice pipeline — pending forever. The child is SIGKILLed past this.
+   */
+  readonly ytdlpTimeoutMs: number;
 }
 
 export interface AdminConfig {
@@ -163,6 +169,7 @@ interface HaOptions {
   ytdlp_format?: string;
   ytdlp_cookies_path?: string;
   search_limit_max?: number;
+  ytdlp_timeout_ms?: number;
   ingress_port?: number;
   admin_bind_address?: string;
   admin_ingress_only?: boolean;
@@ -261,6 +268,7 @@ function build(): Config {
       ytdlpFormat: pick(ha?.ytdlp_format, env.YTDLP_FORMAT, 'bestaudio[ext=webm]/bestaudio/best'),
       cookiesPath: pick(ha?.ytdlp_cookies_path, env.YTDLP_COOKIES_PATH),
       searchLimitMax: clamp(num(ha?.search_limit_max ?? env.SEARCH_LIMIT_MAX, 25), 1, 50),
+      ytdlpTimeoutMs: clamp(num(ha?.ytdlp_timeout_ms ?? env.YTDLP_TIMEOUT_MS, 25_000), 3_000, 120_000),
     },
     admin: {
       ingressPort: clamp(num(ha?.ingress_port ?? env.INGRESS_PORT, 8099), 1, 65535),
